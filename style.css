@@ -533,6 +533,23 @@ body {
 }
 .btn-destructive-sm:hover { background: rgba(255,59,48,0.18); }
 
+.detail-actions { display: flex; gap: 8px; align-items: flex-start; flex-shrink: 0; }
+.btn-soft-sm {
+  background: rgba(0,0,0,0.05);
+  color: var(--text-primary);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: background 0.12s;
+  white-space: nowrap;
+  margin-top: 4px;
+}
+.btn-soft-sm:hover { background: rgba(0,0,0,0.09); }
+
 .btn-icon-circle {
   width: 28px; height: 28px;
   background: var(--blue-light);
@@ -803,4 +820,61 @@ body {
   .field { border-right: none; }
   .field:nth-last-child(2):nth-child(odd) { border-bottom: 1px solid var(--border); }
   .detail-title { font-size: 1.5rem; }
+}
+
+/* ===================================================
+   PRINT / PDF REPORT
+   画面では非表示。印刷（PDF保存）時のみレポートを表示
+   =================================================== */
+.print-report { display: none; }
+
+@media print {
+  body > .sidebar,
+  body > .layout,
+  body > .sidebar-overlay,
+  body > .modal-overlay { display: none !important; }
+
+  .print-report {
+    display: block !important;
+    color: #000;
+    font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+  }
+  body { background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  @page { margin: 14mm; }
+
+  .pr-head { border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 14px; }
+  .pr-title { font-size: 22px; font-weight: 700; }
+  .pr-sub { font-size: 12px; color: #444; margin-top: 4px; }
+
+  .pr-summary { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+  .pr-summary td { border: 1px solid #ccc; padding: 8px 10px; text-align: center; width: 25%; }
+  .pr-summary span { display: block; font-size: 10px; color: #666; margin-bottom: 4px; }
+  .pr-summary b { font-size: 15px; }
+
+  .pr-note {
+    font-size: 12px; background: #f3f3f3; border-radius: 6px;
+    padding: 8px 12px; margin-bottom: 8px; line-height: 1.7;
+  }
+
+  .pr-section {
+    font-size: 13px; font-weight: 700; border-left: 4px solid #000;
+    padding-left: 8px; margin: 18px 0 8px;
+  }
+
+  .pr-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .pr-table th, .pr-table td { border-bottom: 1px solid #ddd; padding: 7px 8px; text-align: left; }
+  .pr-table th {
+    border-bottom: 1.5px solid #999; font-size: 10px; color: #555;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .pr-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .pr-table tfoot td { font-weight: 700; border-top: 1.5px solid #999; border-bottom: none; }
+  .pr-table .muted { color: #999; text-align: center; }
+
+  .pr-foot {
+    margin-top: 22px; padding-top: 8px; border-top: 1px solid #ccc;
+    font-size: 10px; color: #888; text-align: right;
+  }
+
+  table, tr { page-break-inside: avoid; }
 }

@@ -614,6 +614,92 @@ function importBackup(file) {
 }
 
 // =============================================================
+// PDF レポート（印刷 → PDFとして保存）
+// =============================================================
+function buildReportHTML(ev) {
+  const { carryover, collected, spent, balance } = calcSummary(ev);
+  const attending = (ev.members || []).filter(m => m.attending !== false);
+  const n = attending.length;
+  const totalBudget = carryover + collected;
+  const perPerson = n > 0 ? Math.floor(totalBudget / n) : 0;
+
+  // 精算（残高を参加者で割る）
+  let settle = '';
+  if (n > 0) {
+    if (balance > 0) settle = `精算: 一人あたり <b>${fmt(Math.floor(balance / n))}</b> 返金できます（残高 ${fmt(balance)}）`;
+    else if (balance < 0) settle = `精算: 一人あたり <b>${fmt(Math.ceil(-balance / n))}</b> 追加徴収が必要です（不足 ${fmt(-balance)}）`;
+    else settle = '精算: 残高ちょうど ¥0 です';
+  }
+
+  // 未払い集計
+  const unpaid = attending.filter(m => !m.paid);
+  const unpaidSum = unpaid.reduce((s, m) => s + (Number(m.amount) || 0), 0);
+
+  // 支出明細
+  const expRows = (ev.expenses && ev.expenses.length)
+    ? ev.expenses.map(e => `<tr><td>${esc(e.desc)}</td><td class="num">${fmt(e.amount)}</td></tr>`).join('')
+    : '<tr><td colspan="2" class="muted">支出はありません</td></tr>';
+
+  // 参加者
+  const memRows = (ev.members && ev.members.length)
+    ? sortMembers(ev.members).map(m => {
+        const att = m.attending !== false;
+        const role = getRole(m.role);
+        return `<tr>
+          <td>${esc(m.name)}</td>
+          <td>${m.role ? esc(role.label) : '—'}</td>
+          <td>${att ? '参加' : '不参加'}</td>
+          <td class="num">${att ? fmt(m.amount) : '—'}</td>
+          <td>${att ? (m.paid ? '✓ 済' : '未払') : '—'}</td>
+        </tr>`;
+      }).join('')
+    : '<tr><td colspan="5" class="muted">参加者はいません</td></tr>';
+
+  return `
+    <div class="pr-head">
+      <div class="pr-title">${esc(ev.name)}</div>
+      <div class="pr-sub">${dateLabel(ev.date)}${ev.note ? ' ・ ' + esc(ev.note) : ''}</div>
+    </div>
+
+    <table class="pr-summary"><tr>
+      <td><span>前回繰越</span><b>${fmt(carryover)}</b></td>
+      <td><span>集金合計</span><b>${fmt(collected)}</b></td>
+      <td><span>支出合計</span><b>${fmt(spent)}</b></td>
+      <td><span>残高</span><b>${fmt(balance)}</b></td>
+    </tr></table>
+
+    <div class="pr-note">
+      参加 ${n}名 ／ 一人当たり予算 ${n > 0 ? fmt(perPerson) : '—'}
+      ${settle ? '<br>' + settle : ''}
+      ${unpaid.length ? `<br>未払い ${unpaid.length}名 ／ ${fmt(unpaidSum)}` : ''}
+    </div>
+
+    <div class="pr-section">支出明細</div>
+    <table class="pr-table">
+      <thead><tr><th>内容</th><th class="num">金額</th></tr></thead>
+      <tbody>${expRows}</tbody>
+      <tfoot><tr><td>合計</td><td class="num">${fmt(spent)}</td></tr></tfoot>
+    </table>
+
+    <div class="pr-section">参加者・集金（${(ev.members || []).length}名）</div>
+    <table class="pr-table">
+      <thead><tr><th>名前</th><th>役職</th><th>出欠</th><th class="num">集金額</th><th>支払</th></tr></thead>
+      <tbody>${memRows}</tbody>
+    </table>
+
+    <div class="pr-foot">出力日: ${dateLabel(todayISO())}　/　飲み会管理</div>
+  `;
+}
+
+function printReport() {
+  const ev = currentEvent();
+  if (!ev) return;
+  document.getElementById('printReport').innerHTML = buildReportHTML(ev);
+  // 印刷ダイアログの送信先で「PDFとして保存」を選べる
+  window.print();
+}
+
+// =============================================================
 // MEMBERS PAGE
 // =============================================================
 function navigateToMembers() {
@@ -792,6 +878,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // イベント設定
   document.getElementById('btnSaveEvent').addEventListener('click', saveEventSettings);
   document.getElementById('btnDeleteEvent').addEventListener('click', deleteEvent);
+  document.getElementById('btnPrintReport').addEventListener('click', printReport);
 
 
 

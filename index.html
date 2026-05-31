@@ -69,7 +69,10 @@
           <h1 class="detail-title" id="detailTitle">イベント名</h1>
           <div class="detail-subtitle" id="detailSubtitle">日付</div>
         </div>
-        <button class="btn-destructive-sm" id="btnDeleteEvent">削除</button>
+        <div class="detail-actions">
+          <button class="btn-soft-sm" id="btnPrintReport">📄 PDFで保存</button>
+          <button class="btn-destructive-sm" id="btnDeleteEvent">削除</button>
+        </div>
       </div>
 
       <!-- サマリーカード -->
@@ -107,8 +110,6 @@
         </div>
         <div class="per-person-amount" id="perPersonAmount">¥0</div>
       </div>
-
-      <!-- お店を探す -->
 
       <!-- イベント設定 -->
       <div class="card">
@@ -312,6 +313,9 @@
 
 <!-- サイドバーオーバーレイ（モバイル） -->
 <div class="sidebar-overlay hidden" id="sidebarOverlay"></div>
+
+<!-- ===== 印刷用レポート（画面では非表示、印刷/PDF時のみ表示） ===== -->
+<div id="printReport" class="print-report"></div>
 
 <script src="app.js"></script>
 </body>
