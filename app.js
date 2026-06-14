@@ -40,8 +40,9 @@ let state = {
 };
 let currentEventId = null;
 let editingExpenseId = null;
-let currentPage = 'events'; // 'events' | 'members'
+let currentPage = 'events'; // 'events' | 'members' | 'dashboard'
 let editingMemberId = null;
+let showUnpaidOnly = false;  // 参加者リストを未払いのみに絞り込むか
 
 // =============================================================
 // STORAGE
@@ -96,6 +97,14 @@ function fmt(n) {
   const v = Number(n) || 0;
   return '¥' + v.toLocaleString('ja-JP');
 }
+/** Enterキーで送信。ただしIME変換確定中のEnter（日本語入力など）は無視する */
+function onEnterSubmit(el, handler) {
+  el.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    if (e.isComposing || e.keyCode === 229) return; // 変換確定中は送信しない
+    handler();
+  });
+}
 function esc(str) {
   return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
@@ -125,12 +134,51 @@ function currentEvent() {
 
 function calcSummary(ev) {
   const carryover = Number(ev.carryover) || 0;
-  const collected = (ev.members || [])
-    .filter(m => m.attending !== false)
+  const attending = (ev.members || []).filter(m => m.attending !== false);
+  const collected = attending.reduce((s, m) => s + (Number(m.amount) || 0), 0);
+  const paidCollected = attending
+    .filter(m => m.paid)
     .reduce((s, m) => s + (Number(m.amount) || 0), 0);
   const spent = (ev.expenses || [])
     .reduce((s, e) => s + (Number(e.amount) || 0), 0);
-  return { carryover, collected, spent, balance: carryover + collected - spent };
+  return {
+    carryover,
+    collected,                                  // 集金予定額（未払い含む）
+    paidCollected,                              // 実際に集まった額（実収）
+    unpaidAmount: collected - paidCollected,    // 未集金
+    spent,
+    balance: carryover + collected - spent,     // 予定残高（従来どおり）
+    cashBalance: carryover + paidCollected - spent, // 実収ベースの手元残高
+  };
+}
+
+/** 参加人数・総予算・一人当たり予算を計算（画面と帳票で共通） */
+function calcPerPerson(ev) {
+  const { carryover, collected } = calcSummary(ev);
+  const count = (ev.members || []).filter(m => m.attending !== false).length;
+  const totalBudget = carryover + collected;
+  const perPerson = count > 0 ? Math.floor(totalBudget / count) : 0;
+  return { count, totalBudget, perPerson };
+}
+
+/** 集金合計カードの実収/未収サブ表示を更新 */
+function renderCollectedSub(ev) {
+  const el = document.getElementById('sumCollectedSub');
+  if (!el) return;
+  const { collected, unpaidAmount } = calcSummary(ev);
+  el.textContent = unpaidAmount > 0
+    ? `未集金 ${fmt(unpaidAmount)}`
+    : (collected > 0 ? '全額集金済み' : '');
+}
+
+/** 一人当たり予算の表示を更新 */
+function renderPerPerson(ev) {
+  const { count, totalBudget, perPerson } = calcPerPerson(ev);
+  document.getElementById('perPersonAmount').textContent = count > 0 ? fmt(perPerson) : '---';
+  document.getElementById('perPersonSub').textContent =
+    count > 0
+      ? `参加者 ${count}人 ／ 総予算 ${fmt(totalBudget)}`
+      : '参加者を追加してください';
 }
 
 // =============================================================
@@ -140,6 +188,8 @@ function render() {
   renderSidebar();
   if (currentPage === 'members') {
     renderMembersPage();
+  } else if (currentPage === 'dashboard') {
+    renderDashboard();
   } else {
     renderDetail();
   }
@@ -178,11 +228,21 @@ function renderSidebar() {
     });
   }
 
-  // メンバー管理ナビ
-  const navBtn = document.getElementById('btnNavMembers');
-  navBtn.classList.toggle('active', currentPage === 'members');
+  // ナビ active 状態
+  document.getElementById('btnNavMembers').classList.toggle('active', currentPage === 'members');
+  const dashNav = document.getElementById('btnNavDashboard');
+  if (dashNav) dashNav.classList.toggle('active', currentPage === 'dashboard');
   const badge = document.getElementById('memberCountBadge');
   badge.textContent = state.members.length > 0 ? String(state.members.length) : '';
+
+  // 最終バックアップ日
+  const bi = document.getElementById('backupInfo');
+  if (bi) {
+    bi.textContent = state.lastBackupAt
+      ? `最終バックアップ: ${dateLabel(state.lastBackupAt)}`
+      : '⚠️ バックアップ未実施';
+    bi.classList.toggle('warn', !state.lastBackupAt);
+  }
 }
 
 /* ----- Detail ----- */
@@ -192,8 +252,9 @@ function renderDetail() {
   const detail = document.getElementById('eventDetail');
   const membersPage = document.getElementById('membersPage');
 
-  // ァンバーページは非表示
+  // 他ページは非表示
   membersPage.classList.add('hidden');
+  document.getElementById('dashboardPage').classList.add('hidden');
 
   if (!ev) {
     empty.classList.remove('hidden');
@@ -216,16 +277,10 @@ function renderDetail() {
   document.getElementById('sumBalance').textContent = fmt(balance);
   const balCard = document.getElementById('cardBalance');
   balCard.classList.toggle('negative', balance < 0);
+  renderCollectedSub(ev);
 
   // 一人当たり予算
-  const attendingMembers = (ev.members || []).filter(m => m.attending !== false);
-  const totalBudget = carryover + collected;
-  const perPerson = attendingMembers.length > 0 ? Math.floor(totalBudget / attendingMembers.length) : 0;
-  document.getElementById('perPersonAmount').textContent = attendingMembers.length > 0 ? fmt(perPerson) : '---';
-  document.getElementById('perPersonSub').textContent =
-    attendingMembers.length > 0
-      ? `参加者 ${attendingMembers.length}人 ／ 総予算 ${fmt(totalBudget)}`
-      : '参加者を追加してください';
+  renderPerPerson(ev);
 
   // フォーム
   document.getElementById('eventName').value = ev.name || '';
@@ -264,8 +319,15 @@ function renderExpenses(ev) {
     btn.addEventListener('click', () => {
       const ev2 = currentEvent();
       if (!ev2) return;
-      ev2.expenses = ev2.expenses.filter(e => e.id !== btn.dataset.eid);
-      saveState(); render();
+      const exp = ev2.expenses.find(e => e.id === btn.dataset.eid);
+      openConfirmModal(
+        '支出を削除しますか？',
+        exp ? `「${exp.desc}」${fmt(exp.amount)} を削除します。` : 'この支出を削除します。',
+        () => {
+          ev2.expenses = ev2.expenses.filter(e => e.id !== btn.dataset.eid);
+          saveState(); render();
+        }
+      );
     });
   });
 }
@@ -273,11 +335,36 @@ function renderExpenses(ev) {
 /* ----- Members ----- */
 function renderMembers(ev) {
   const el = document.getElementById('memberList');
-  if (!ev.members || !ev.members.length) {
+  const toolbar = document.getElementById('memberToolbar');
+  const all = sortMembers(ev.members || []);
+
+  // 未払いサマリー＆フィルタ用ツールバー
+  const attending = all.filter(m => m.attending !== false);
+  const unpaid = attending.filter(m => !m.paid);
+  if (toolbar) {
+    if (all.length) {
+      toolbar.style.display = '';
+      const unpaidSum = unpaid.reduce((s, m) => s + (Number(m.amount) || 0), 0);
+      document.getElementById('unpaidSummary').textContent =
+        unpaid.length ? `未払い ${unpaid.length}名 ／ ${fmt(unpaidSum)}` : '全員支払い済み 🎉';
+      document.getElementById('filterUnpaid').checked = showUnpaidOnly;
+    } else {
+      toolbar.style.display = 'none';
+    }
+  }
+
+  if (!all.length) {
     el.innerHTML = '<div class="list-empty">参加者はまだいません</div>';
     return;
   }
-  el.innerHTML = sortMembers(ev.members).map(m => {
+
+  const list = showUnpaidOnly ? attending.filter(m => !m.paid) : all;
+  if (!list.length) {
+    el.innerHTML = '<div class="list-empty">未払いの参加者はいません 🎉</div>';
+    return;
+  }
+
+  el.innerHTML = list.map(m => {
     const attending = m.attending !== false;
     const paid = !!m.paid;
     const initials = m.name.slice(0, 2);
@@ -327,19 +414,13 @@ function renderMembers(ev) {
       mem.amount = Number(inp.value) || 0;
       saveState();
       // サマリーを再描画（メンバーリストは再レンダリングしない）
-      const { carryover, collected, spent, balance } = calcSummary(ev2);
+      const { collected, balance } = calcSummary(ev2);
       document.getElementById('sumCollected').textContent = fmt(collected);
       document.getElementById('sumBalance').textContent = fmt(balance);
       document.getElementById('cardBalance').classList.toggle('negative', balance < 0);
+      renderCollectedSub(ev2);
       // 一人当たり予算も更新
-      const attending = (ev2.members || []).filter(m => m.attending !== false);
-      const totalBudget = carryover + collected;
-      const perPerson = attending.length > 0 ? Math.floor(totalBudget / attending.length) : 0;
-      document.getElementById('perPersonAmount').textContent = attending.length > 0 ? fmt(perPerson) : '---';
-      document.getElementById('perPersonSub').textContent =
-        attending.length > 0
-          ? `参加者 ${attending.length}人 ／ 総予算 ${fmt(totalBudget)}`
-          : '参加者を追加してください';
+      renderPerPerson(ev2);
     });
   });
 
@@ -356,10 +437,40 @@ function renderMembers(ev) {
   el.querySelectorAll('.member-remove').forEach(btn => {
     btn.addEventListener('click', () => {
       const ev2 = currentEvent();
-      ev2.members = ev2.members.filter(m => m.id !== btn.dataset.mid);
-      saveState(); render();
+      if (!ev2) return;
+      const mem = ev2.members.find(m => m.id === btn.dataset.mid);
+      openConfirmModal(
+        '参加者を削除しますか？',
+        mem ? `「${mem.name}」を参加者リストから削除します。集金額・支払状況も失われます。` : 'この参加者を削除します。',
+        () => {
+          ev2.members = ev2.members.filter(m => m.id !== btn.dataset.mid);
+          saveState(); render();
+        }
+      );
     });
   });
+}
+
+// =============================================================
+// 割り勘オートフィル
+// =============================================================
+function splitEqually() {
+  const ev = currentEvent();
+  if (!ev) return;
+  const { carryover, spent } = calcSummary(ev);
+  const attending = (ev.members || []).filter(m => m.attending !== false);
+  const n = attending.length;
+  if (n === 0) { alert('参加者がいません。先にメンバーを追加してください。'); return; }
+  const need = Math.max(0, spent - carryover); // 集金で賄う必要額
+  const per = Math.ceil(need / n);             // 不足が出ないよう切り上げ
+  openConfirmModal(
+    '割り勘で一括入力しますか？',
+    `参加者 ${n}名 の集金額をそれぞれ ${fmt(per)} に設定します（支出 ${fmt(spent)} − 繰越 ${fmt(carryover)} を均等割り）。手入力した金額は上書きされます。`,
+    () => {
+      attending.forEach(m => { m.amount = per; });
+      saveState(); render();
+    }
+  );
 }
 
 // =============================================================
@@ -517,8 +628,7 @@ function registerNewMember() {
   const name = document.getElementById('newMemberName').value.trim();
   if (!name) return;
   if (state.members.find(m => m.name === name)) {
-    alert(`「${name}」はすでに登録されています。`);
-    return;
+    if (!confirm(`「${name}」は既に登録されています。別人として追加しますか？`)) return;
   }
   const regId = uid();
   state.members.push({ id: regId, name });
@@ -581,7 +691,50 @@ function closeConfirmModal() {
 // =============================================================
 // BACKUP
 // =============================================================
+/** 復元データを正規化し、壊れた/欠損フィールドを安全な既定値で補う */
+function normalizeState(raw) {
+  const out = { events: [], members: [] };
+  if (raw && Array.isArray(raw.events)) {
+    out.events = raw.events.filter(e => e && typeof e === 'object').map(e => ({
+      id: e.id || uid(),
+      name: typeof e.name === 'string' ? e.name : '(無題)',
+      date: typeof e.date === 'string' ? e.date : '',
+      note: typeof e.note === 'string' ? e.note : '',
+      carryover: Number(e.carryover) || 0,
+      expenses: Array.isArray(e.expenses)
+        ? e.expenses.filter(x => x && typeof x === 'object').map(x => ({
+            id: x.id || uid(),
+            desc: typeof x.desc === 'string' ? x.desc : '',
+            amount: Number(x.amount) || 0,
+          }))
+        : [],
+      members: Array.isArray(e.members)
+        ? e.members.filter(x => x && typeof x === 'object').map(x => ({
+            id: x.id || uid(),
+            name: typeof x.name === 'string' ? x.name : '',
+            attending: x.attending !== false,
+            amount: Number(x.amount) || 0,
+            paid: !!x.paid,
+            role: typeof x.role === 'string' ? x.role : '',
+            registeredId: x.registeredId,
+          }))
+        : [],
+    }));
+  }
+  if (raw && Array.isArray(raw.members)) {
+    out.members = raw.members.filter(m => m && typeof m === 'object').map(m => ({
+      id: m.id || uid(),
+      name: typeof m.name === 'string' ? m.name : '',
+      role: typeof m.role === 'string' ? m.role : '',
+    }));
+  }
+  if (raw && typeof raw.lastBackupAt === 'string') out.lastBackupAt = raw.lastBackupAt;
+  return out;
+}
+
 function exportBackup() {
+  state.lastBackupAt = todayISO();
+  saveState();
   const data = JSON.stringify({ state, currentEventId, exportedAt: new Date().toISOString() }, null, 2);
   const blob = new Blob([data], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -593,6 +746,7 @@ function exportBackup() {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+  renderSidebar(); // 最終バックアップ日表示を更新
 }
 
 function importBackup(file) {
@@ -601,10 +755,13 @@ function importBackup(file) {
     try {
       const parsed = JSON.parse(e.target.result);
       const imported = parsed.state || parsed;
-      if (!imported.events || !Array.isArray(imported.events)) throw new Error('Invalid format');
+      if (!imported || !Array.isArray(imported.events)) throw new Error('Invalid format');
       if (!confirm('バックアップを復元しますか？現在のデータはすべて置き換えられます。')) return;
-      state = imported;
-      currentEventId = parsed.currentEventId || (state.events.length ? state.events[state.events.length - 1].id : null);
+      state = normalizeState(imported);
+      currentEventId = (parsed.currentEventId && state.events.find(ev => ev.id === parsed.currentEventId))
+        ? parsed.currentEventId
+        : (state.events.length ? state.events[state.events.length - 1].id : null);
+      currentPage = 'events';
       saveState(); render();
     } catch {
       alert('ファイルの形式が正しくありません。');
@@ -620,20 +777,22 @@ function buildReportHTML(ev) {
   const { carryover, collected, spent, balance } = calcSummary(ev);
   const attending = (ev.members || []).filter(m => m.attending !== false);
   const n = attending.length;
-  const totalBudget = carryover + collected;
-  const perPerson = n > 0 ? Math.floor(totalBudget / n) : 0;
-
-  // 精算（残高を参加者で割る）
-  let settle = '';
-  if (n > 0) {
-    if (balance > 0) settle = `精算: 一人あたり <b>${fmt(Math.floor(balance / n))}</b> 返金できます（残高 ${fmt(balance)}）`;
-    else if (balance < 0) settle = `精算: 一人あたり <b>${fmt(Math.ceil(-balance / n))}</b> 追加徴収が必要です（不足 ${fmt(-balance)}）`;
-    else settle = '精算: 残高ちょうど ¥0 です';
-  }
+  const { perPerson } = calcPerPerson(ev);
 
   // 未払い集計
   const unpaid = attending.filter(m => !m.paid);
   const unpaidSum = unpaid.reduce((s, m) => s + (Number(m.amount) || 0), 0);
+
+  // 精算（残高を参加者で割る）。未集金があると手元現金と残高が一致せず
+  // 返金額を誤って提示してしまうため、全員集金済みのときだけ計算する。
+  let settle = '';
+  if (n > 0 && unpaid.length === 0) {
+    if (balance > 0) settle = `精算: 一人あたり <b>${fmt(Math.floor(balance / n))}</b> 返金できます（残高 ${fmt(balance)}）`;
+    else if (balance < 0) settle = `精算: 一人あたり <b>${fmt(Math.ceil(-balance / n))}</b> 追加徴収が必要です（不足 ${fmt(-balance)}）`;
+    else settle = '精算: 残高ちょうど ¥0 です';
+  } else if (n > 0) {
+    settle = '精算: 集金がすべて完了すると計算できます';
+  }
 
   // 支出明細
   const expRows = (ev.expenses && ev.expenses.length)
@@ -658,7 +817,7 @@ function buildReportHTML(ev) {
   return `
     <div class="pr-head">
       <div class="pr-title">${esc(ev.name)}</div>
-      <div class="pr-sub">${dateLabel(ev.date)}${ev.note ? ' ・ ' + esc(ev.note) : ''}</div>
+      <div class="pr-sub">${esc(dateLabel(ev.date))}${ev.note ? ' ・ ' + esc(ev.note) : ''}</div>
     </div>
 
     <table class="pr-summary"><tr>
@@ -691,12 +850,114 @@ function buildReportHTML(ev) {
   `;
 }
 
-function printReport() {
+// 現在のイベント内容を印刷用レポートに反映する。内容があるときだけ
+// body に .printing を付け、ブラウザ標準の印刷（Cmd/Ctrl+P）でも同じ
+// レポートが出るようにする。内容が無ければ画面をそのまま印刷させる。
+function preparePrintReport() {
+  const el = document.getElementById('printReport');
+  if (!el) return false;
   const ev = currentEvent();
-  if (!ev) return;
-  document.getElementById('printReport').innerHTML = buildReportHTML(ev);
+  if (!ev) {
+    el.innerHTML = '';
+    document.body.classList.remove('printing');
+    return false;
+  }
+  el.innerHTML = buildReportHTML(ev);
+  document.body.classList.add('printing');
+  return true;
+}
+
+function clearPrintReport() {
+  document.body.classList.remove('printing');
+  const el = document.getElementById('printReport');
+  if (el) el.innerHTML = '';
+}
+
+function printReport() {
   // 印刷ダイアログの送信先で「PDFとして保存」を選べる
-  window.print();
+  if (preparePrintReport()) window.print();
+}
+
+// =============================================================
+// DASHBOARD（全イベント俯瞰）
+// =============================================================
+function navigateToDashboard() {
+  currentPage = 'dashboard';
+  saveState();
+  render();
+  closeMobileSidebar();
+}
+
+function renderDashboard() {
+  document.getElementById('emptyState').classList.add('hidden');
+  document.getElementById('eventDetail').classList.add('hidden');
+  document.getElementById('membersPage').classList.add('hidden');
+  document.getElementById('dashboardPage').classList.remove('hidden');
+
+  const evs = state.events || [];
+  let totalSpent = 0, totalPaid = 0, totalUnpaid = 0;
+  evs.forEach(ev => {
+    const s = calcSummary(ev);
+    totalSpent += s.spent;
+    totalPaid += s.paidCollected;
+    totalUnpaid += s.unpaidAmount;
+  });
+
+  // 統計カード
+  const stats = [
+    { icon: '📅', label: 'イベント数', value: `${evs.length}件`, cls: '' },
+    { icon: '💸', label: '総支出', value: fmt(totalSpent), cls: 'red' },
+    { icon: '💰', label: '実収合計', value: fmt(totalPaid), cls: 'green' },
+    { icon: '⏳', label: '未回収合計', value: fmt(totalUnpaid), cls: totalUnpaid > 0 ? 'red' : '' },
+  ];
+  document.getElementById('dashStats').innerHTML = stats.map(s => `
+    <div class="summary-card">
+      <div class="summary-icon">${s.icon}</div>
+      <div class="summary-amount ${s.cls}">${s.value}</div>
+      <div class="summary-label">${s.label}</div>
+    </div>`).join('');
+
+  // イベント一覧
+  const listEl = document.getElementById('dashEventList');
+  if (!evs.length) {
+    listEl.innerHTML = '<div class="list-empty">イベントがありません</div>';
+    return;
+  }
+  const rows = evs.slice().reverse().map(ev => {
+    const s = calcSummary(ev);
+    const attendCount = (ev.members || []).filter(m => m.attending !== false).length;
+    const unpaidCount = (ev.members || []).filter(m => m.attending !== false && !m.paid).length;
+    return `<tr class="dash-row" data-id="${ev.id}" role="button" tabindex="0">
+      <td class="dash-name">${esc(ev.name)}</td>
+      <td>${ev.date ? esc(dateLabel(ev.date)) : '—'}</td>
+      <td class="num">${attendCount}名</td>
+      <td class="num">${fmt(s.spent)}</td>
+      <td class="num">${fmt(s.paidCollected)}</td>
+      <td class="num" style="color:${s.balance < 0 ? 'var(--red)' : 'var(--green)'}">${fmt(s.balance)}</td>
+      <td class="num">${unpaidCount ? `<span class="dash-unpaid">${unpaidCount}名</span>` : '—'}</td>
+    </tr>`;
+  }).join('');
+  listEl.innerHTML = `
+    <div class="dash-table-wrap">
+      <table class="dash-table">
+        <thead><tr>
+          <th>イベント</th><th>日付</th><th class="num">参加</th>
+          <th class="num">支出</th><th class="num">実収</th><th class="num">残高</th><th class="num">未払</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+
+  const openEvent = id => {
+    currentPage = 'events';
+    currentEventId = id;
+    saveState();
+    render();
+  };
+  listEl.querySelectorAll('.dash-row').forEach(row => {
+    row.addEventListener('click', () => openEvent(row.dataset.id));
+    row.addEventListener('keydown', e => { if (e.key === 'Enter') openEvent(row.dataset.id); });
+  });
 }
 
 // =============================================================
@@ -716,6 +977,7 @@ function renderMembersPage() {
 
   empty.classList.add('hidden');
   detail.classList.add('hidden');
+  document.getElementById('dashboardPage').classList.add('hidden');
   page.classList.remove('hidden');
 
   const el = document.getElementById('globalMemberList');
@@ -780,8 +1042,7 @@ function addGlobalMember() {
   const name = input.value.trim();
   if (!name) { input.focus(); return; }
   if (state.members.find(m => m.name === name)) {
-    alert(`「${name}」はすでに登録されています。`);
-    return;
+    if (!confirm(`「${name}」は既に登録されています。別人として追加しますか？`)) return;
   }
   state.members.push({ id: uid(), name });
   input.value = '';
@@ -839,21 +1100,18 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnNewEvent').addEventListener('click', openNewEventModal);
   document.getElementById('btnNewEventEmpty').addEventListener('click', openNewEventModal);
 
-  // サイドバー: メンバー管理ナビ
+  // サイドバー: ナビ
+  document.getElementById('btnNavDashboard').addEventListener('click', navigateToDashboard);
   document.getElementById('btnNavMembers').addEventListener('click', navigateToMembers);
 
   // メンバー管理ページ
   document.getElementById('btnAddGlobalMember').addEventListener('click', addGlobalMember);
-  document.getElementById('globalMemberName').addEventListener('keydown', e => {
-    if (e.key === 'Enter') addGlobalMember();
-  });
+  onEnterSubmit(document.getElementById('globalMemberName'), addGlobalMember);
 
   // 名前編集モーダル
   document.getElementById('btnCancelEditMember').addEventListener('click', closeEditMemberModal);
   document.getElementById('btnSaveEditMember').addEventListener('click', saveEditMember);
-  document.getElementById('editMemberName').addEventListener('keydown', e => {
-    if (e.key === 'Enter') saveEditMember();
-  });
+  onEnterSubmit(document.getElementById('editMemberName'), saveEditMember);
   document.getElementById('modalEditMember').addEventListener('click', e => {
     if (e.target.id === 'modalEditMember') closeEditMemberModal();
   });
@@ -861,24 +1119,34 @@ document.addEventListener('DOMContentLoaded', () => {
   // 新規イベントモーダル
   document.getElementById('btnCancelNewEvent').addEventListener('click', closeNewEventModal);
   document.getElementById('btnCreateEvent').addEventListener('click', createEvent);
-  document.getElementById('newEventName').addEventListener('keydown', e => { if (e.key === 'Enter') createEvent(); });
+  onEnterSubmit(document.getElementById('newEventName'), createEvent);
 
   // 支出モーダル
   document.getElementById('btnAddExpense').addEventListener('click', () => openExpenseModal(null));
   document.getElementById('btnCancelExpense').addEventListener('click', closeExpenseModal);
   document.getElementById('btnSaveExpense').addEventListener('click', saveExpense);
-  document.getElementById('expenseAmount').addEventListener('keydown', e => { if (e.key === 'Enter') saveExpense(); });
+  onEnterSubmit(document.getElementById('expenseAmount'), saveExpense);
 
   // メンバーモーダル
   document.getElementById('btnAddMember').addEventListener('click', openMemberModal);
   document.getElementById('btnCancelMember').addEventListener('click', closeMemberModal);
   document.getElementById('btnRegisterMember').addEventListener('click', registerNewMember);
-  document.getElementById('newMemberName').addEventListener('keydown', e => { if (e.key === 'Enter') registerNewMember(); });
+  onEnterSubmit(document.getElementById('newMemberName'), registerNewMember);
+
+  // 割り勘・未払いフィルタ
+  document.getElementById('btnSplitEqually').addEventListener('click', splitEqually);
+  document.getElementById('filterUnpaid').addEventListener('change', e => {
+    showUnpaidOnly = e.target.checked;
+    renderDetail();
+  });
 
   // イベント設定
   document.getElementById('btnSaveEvent').addEventListener('click', saveEventSettings);
   document.getElementById('btnDeleteEvent').addEventListener('click', deleteEvent);
   document.getElementById('btnPrintReport').addEventListener('click', printReport);
+  // 標準の印刷（Cmd/Ctrl+P や共有→印刷）でも正しいレポートを出す
+  window.addEventListener('beforeprint', preparePrintReport);
+  window.addEventListener('afterprint', clearPrintReport);
 
 
 

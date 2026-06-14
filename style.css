@@ -823,48 +823,111 @@ body {
 }
 
 /* ===================================================
+   集金カードのサブ表示・カードヘッダー操作群
+   =================================================== */
+.summary-sub {
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  font-weight: 600;
+}
+.card-header-actions { display: flex; align-items: center; gap: 8px; }
+.card-header-actions .btn-soft-sm { margin-top: 0; }
+
+/* ===== 参加者ツールバー（未払いサマリー＆フィルタ） ===== */
+.member-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0,0,0,0.015);
+  flex-wrap: wrap;
+}
+.member-toolbar-info { font-size: 0.82rem; color: var(--text-secondary); font-weight: 600; }
+.member-toolbar-toggle {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.8rem; color: var(--text-secondary); cursor: pointer; user-select: none;
+}
+.member-toolbar-toggle input { cursor: pointer; }
+
+/* ===== サイドバー: 最終バックアップ表示 ===== */
+.sidebar-backup-info {
+  padding: 6px 10px 2px;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  opacity: 0.8;
+}
+.sidebar-backup-info.warn { color: var(--red); opacity: 1; }
+
+/* ===================================================
+   DASHBOARD（イベント一覧テーブル）
+   =================================================== */
+.dash-table-wrap { overflow-x: auto; }
+.dash-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.dash-table th, .dash-table td {
+  padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.dash-table th {
+  font-size: 0.7rem; color: var(--text-secondary); font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.4px;
+}
+.dash-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.dash-table .dash-name { font-weight: 600; color: var(--text-primary); }
+.dash-row { cursor: pointer; transition: background 0.12s; }
+.dash-row:hover { background: var(--bg-hover); }
+.dash-unpaid {
+  display: inline-block; padding: 1px 8px; border-radius: 999px;
+  background: rgba(255,59,48,0.12); color: var(--red); font-weight: 600; font-size: 0.78rem;
+}
+
+/* ===================================================
    PRINT / PDF REPORT
    画面では非表示。印刷（PDF保存）時のみレポートを表示
    =================================================== */
 .print-report { display: none; }
 
 @media print {
-  body > .sidebar,
-  body > .layout,
-  body > .sidebar-overlay,
-  body > .modal-overlay { display: none !important; }
+  /* レポート内容があるとき（body.printing）だけアプリUIを隠す。
+     内容が無ければ通常どおり画面を印刷させ、白紙を防ぐ。 */
+  body.printing > .sidebar,
+  body.printing > .layout,
+  body.printing > .sidebar-overlay,
+  body.printing > .modal-overlay { display: none !important; }
 
-  .print-report {
+  body.printing .print-report {
     display: block !important;
     color: #000;
     font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
   }
-  body { background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body.printing { background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   @page { margin: 14mm; }
 
-  .pr-head { border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 14px; }
-  .pr-title { font-size: 22px; font-weight: 700; }
-  .pr-sub { font-size: 12px; color: #444; margin-top: 4px; }
+  .pr-head { border-bottom: 2px solid #000; padding-bottom: 14px; margin-bottom: 26px; }
+  .pr-title { font-size: 26px; font-weight: 700; }
+  .pr-sub { font-size: 13px; color: #444; margin-top: 7px; }
 
-  .pr-summary { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
-  .pr-summary td { border: 1px solid #ccc; padding: 8px 10px; text-align: center; width: 25%; }
-  .pr-summary span { display: block; font-size: 10px; color: #666; margin-bottom: 4px; }
-  .pr-summary b { font-size: 15px; }
+  .pr-summary { width: 100%; border-collapse: collapse; margin-bottom: 22px; }
+  .pr-summary td { border: 1px solid #ccc; padding: 16px 12px; text-align: center; width: 25%; }
+  .pr-summary span { display: block; font-size: 11px; color: #666; margin-bottom: 8px; }
+  .pr-summary b { font-size: 19px; }
 
   .pr-note {
-    font-size: 12px; background: #f3f3f3; border-radius: 6px;
-    padding: 8px 12px; margin-bottom: 8px; line-height: 1.7;
+    font-size: 13px; background: #f3f3f3; border-radius: 8px;
+    padding: 14px 18px; margin-bottom: 22px; line-height: 2;
   }
 
   .pr-section {
-    font-size: 13px; font-weight: 700; border-left: 4px solid #000;
-    padding-left: 8px; margin: 18px 0 8px;
+    font-size: 15px; font-weight: 700; border-left: 4px solid #000;
+    padding-left: 10px; margin: 30px 0 14px;
   }
 
-  .pr-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  .pr-table th, .pr-table td { border-bottom: 1px solid #ddd; padding: 7px 8px; text-align: left; }
+  .pr-table { width: 100%; border-collapse: collapse; font-size: 13px; line-height: 1.5; }
+  .pr-table th, .pr-table td { border-bottom: 1px solid #ddd; padding: 12px 10px; text-align: left; }
   .pr-table th {
-    border-bottom: 1.5px solid #999; font-size: 10px; color: #555;
+    border-bottom: 1.5px solid #999; font-size: 11px; color: #555;
     text-transform: uppercase; letter-spacing: 0.5px;
   }
   .pr-table .num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -872,9 +935,12 @@ body {
   .pr-table .muted { color: #999; text-align: center; }
 
   .pr-foot {
-    margin-top: 22px; padding-top: 8px; border-top: 1px solid #ccc;
-    font-size: 10px; color: #888; text-align: right;
+    margin-top: 34px; padding-top: 12px; border-top: 1px solid #ccc;
+    font-size: 11px; color: #888; text-align: right;
   }
 
-  table, tr { page-break-inside: avoid; }
+  /* 行が途中で割れないようにする。table 全体に付けると長い表が
+     丸ごと次ページへ送られ余白が出るため tr のみに適用。 */
+  .pr-table tr { page-break-inside: avoid; }
+  .pr-table thead { display: table-header-group; }
 }
