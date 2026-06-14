@@ -340,6 +340,20 @@ body {
   max-width: 320px;
   line-height: 1.7;
 }
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  font-family: var(--font);
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 8px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  margin-top: -8px;
+  transition: background 0.12s, color 0.12s;
+}
+.btn-ghost:hover { background: var(--bg-hover); color: var(--text-primary); }
 
 /* ===================================================
    DETAIL TITLEBAR

@@ -138,10 +138,52 @@ function loadState() {
       }
       // 日付データのマイグレーション: 不正な形式(例:202604-01-21)を修正
       migrateDates();
+    } else {
+      // 初回（保存データが無い）のときだけチュートリアル用サンプルを投入。
+      // 一度でも保存されればキーが残るので、削除しても二度と復活しない。
+      loadTutorialSample();
     }
   } catch (e) {
     console.warn('Failed to load state', e);
   }
+}
+
+/** チュートリアル用のサンプルデータを投入（初回 / 空状態の「サンプルを見る」から呼ぶ） */
+function loadTutorialSample() {
+  const reg = [
+    { id: uid(), name: '田中 太郎',  role: 'president' },
+    { id: uid(), name: '佐藤 花子',  role: 'division' },
+    { id: uid(), name: '鈴木 一郎',  role: 'manager' },
+    { id: uid(), name: '高橋 美咲',  role: '' },
+  ];
+  const mem = (r, amount, paid) => ({
+    id: uid(), name: r.name, role: r.role, registeredId: r.id,
+    attending: true, amount, paid,
+  });
+  const ev = {
+    id: uid(),
+    name: '🍻 サンプル飲み会（使い方の例）',
+    date: todayISO(),
+    note: 'これは使い方の見本です。不要なら右上の「削除」で消せます',
+    carryover: 3000,
+    completed: false,
+    completedAt: null,
+    expenses: [
+      { id: uid(), desc: 'お店代', amount: 16000 },
+    ],
+    members: [
+      mem(reg[0], 6000, true),
+      mem(reg[1], 6000, true),
+      mem(reg[2], 6000, true),
+      mem(reg[3], 6000, false),   // 未払い → 未集金・未払いフィルタの見本
+    ],
+  };
+  // 既存データは消さず追加（メンバーだけ登録済みでも安全）
+  state.members.push(...reg);
+  state.events.push(ev);
+  currentEventId = ev.id;
+  currentPage = 'events';
+  saveState();
 }
 
 function migrateDates() {
@@ -1300,6 +1342,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // サイドバー: 新規イベント
   document.getElementById('btnNewEvent').addEventListener('click', openNewEventModal);
   document.getElementById('btnNewEventEmpty').addEventListener('click', openNewEventModal);
+  document.getElementById('btnLoadSample').addEventListener('click', () => { loadTutorialSample(); render(); });
 
   // サイドバー: ナビ
   document.getElementById('btnNavDashboard').addEventListener('click', navigateToDashboard);
