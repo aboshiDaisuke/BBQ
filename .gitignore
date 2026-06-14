@@ -1,0 +1,4 @@
+# 元データ（デザイン配布zip・キャラの元画像）はリポジトリに含めない
+# 加工済みの assets/mascot.png のみ管理する
+bbq.zip
+ChatGPT Image*.png
