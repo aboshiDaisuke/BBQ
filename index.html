@@ -6,10 +6,24 @@
 <title>飲み会 予算管理</title>
 <meta name="description" content="飲み会・BBQなどのイベント予算を管理するアプリ">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800;900&family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+<!-- ===== スプラッシュ（起動画面） ===== -->
+<div id="splashScreen" class="splash">
+  <div class="splash-inner">
+    <div class="splash-mascot-wrap">
+      <div class="splash-glow"></div>
+      <img class="splash-mascot" src="assets/mascot.png" alt="" width="198" height="300" decoding="async">
+    </div>
+    <div class="splash-title">飲み会管理</div>
+    <div class="splash-tagline">かんぱーい！🍻 予算と集金、まるっとおまかせ</div>
+    <button class="splash-start" id="splashStart" type="button">タップして始める</button>
+  </div>
+</div>
 
 <!-- ===== SIDEBAR ===== -->
 <aside class="sidebar" id="sidebar">
@@ -72,9 +86,11 @@
       <div class="detail-titlebar">
         <div>
           <h1 class="detail-title" id="detailTitle">イベント名</h1>
+          <span class="detail-complete-flag" id="completeFlag" hidden>✓ 精算完了</span>
           <div class="detail-subtitle" id="detailSubtitle">日付</div>
         </div>
         <div class="detail-actions">
+          <button class="btn-soft-sm" id="btnToggleComplete">✅ 精算完了にする</button>
           <button class="btn-soft-sm" id="btnPrintReport">📄 PDFで保存</button>
           <button class="btn-destructive-sm" id="btnDeleteEvent">削除</button>
         </div>
@@ -115,6 +131,18 @@
           </div>
         </div>
         <div class="per-person-amount" id="perPersonAmount">¥0</div>
+      </div>
+
+      <!-- 次回への繰越金 -->
+      <div class="carry-forward-bar" id="carryForwardBar">
+        <div class="per-person-left">
+          <span class="carry-forward-icon">🔄</span>
+          <div>
+            <div class="per-person-label">次回イベントへの繰越金</div>
+            <div class="per-person-sub" id="carryForwardSub">実際に集まった現金（手元）</div>
+          </div>
+        </div>
+        <div class="carry-forward-amount" id="carryForwardAmount">¥0</div>
       </div>
 
       <!-- イベント設定 -->
@@ -165,9 +193,18 @@
         </div>
         <div class="member-toolbar" id="memberToolbar" style="display:none">
           <span class="member-toolbar-info" id="unpaidSummary"></span>
-          <label class="member-toolbar-toggle">
-            <input type="checkbox" id="filterUnpaid"> 未払いのみ表示
-          </label>
+          <div class="member-toolbar-right">
+            <label class="member-sort">並び替え
+              <select id="memberSortSelect">
+                <option value="role">役職順</option>
+                <option value="kana">五十音順</option>
+                <option value="manual">手動（ドラッグ）</option>
+              </select>
+            </label>
+            <label class="member-toolbar-toggle">
+              <input type="checkbox" id="filterUnpaid"> 未払いのみ表示
+            </label>
+          </div>
         </div>
         <div id="memberList"></div>
       </div>
@@ -194,6 +231,16 @@
               placeholder="名前を入力（例: 田中 太郎）">
             <button class="btn-primary" id="btnAddGlobalMember">追加</button>
           </div>
+        </div>
+        <div class="member-toolbar" id="globalMemberToolbar" style="display:none">
+          <span class="member-toolbar-info" id="globalMemberCount"></span>
+          <label class="member-sort">並び替え
+            <select id="globalSortSelect">
+              <option value="role">役職順</option>
+              <option value="kana">五十音順</option>
+              <option value="manual">手動（ドラッグ）</option>
+            </select>
+          </label>
         </div>
         <div id="globalMemberList"></div>
       </div>

@@ -4,14 +4,15 @@
 // ROLES
 // =============================================================
 const ROLES = [
-  { id: '',            label: '役職なし',       color: '#aeaeb2', bg: 'rgba(174,174,178,0.12)', rank: 99 },
-  { id: 'president',   label: '社長',           color: '#bf5af2', bg: 'rgba(191,90,242,0.12)',  rank: 1  },
-  { id: 'director',    label: '取締役',         color: '#0071e3', bg: 'rgba(0,113,227,0.1)',    rank: 2  },
-  { id: 'head',        label: '室長',           color: '#0096c7', bg: 'rgba(0,150,199,0.1)',    rank: 3  },
-  { id: 'manager',     label: 'マネージャー',   color: '#34c759', bg: 'rgba(52,199,89,0.1)',    rank: 4  },
-  { id: 'chief',       label: 'チーフ',         color: '#ff9500', bg: 'rgba(255,149,0,0.12)',   rank: 5  },
-  { id: 'leader',      label: 'リーダー',       color: '#ff6b35', bg: 'rgba(255,107,53,0.1)',   rank: 6  },
-  { id: 'subleader',   label: 'サブリーダー',   color: '#ff9f0a', bg: 'rgba(255,159,10,0.1)',   rank: 7  },
+  { id: '',            label: '役職なし',       color: '#b0a89e', bg: 'rgba(176,168,158,0.16)', rank: 99 },
+  { id: 'president',   label: '社長',           color: '#8b5cf6', bg: 'rgba(139,92,246,0.15)',  rank: 1  },
+  { id: 'director',    label: '取締役',         color: '#3b9eff', bg: 'rgba(59,158,255,0.15)',  rank: 2  },
+  { id: 'division',    label: '事業部長',       color: '#6c7cff', bg: 'rgba(108,124,255,0.15)', rank: 3  },
+  { id: 'head',        label: '室長',           color: '#12b5c9', bg: 'rgba(18,181,201,0.15)',  rank: 4  },
+  { id: 'manager',     label: 'マネージャー',   color: '#1bc47d', bg: 'rgba(27,196,125,0.15)',  rank: 5  },
+  { id: 'chief',       label: 'チーフ',         color: '#ff9f1c', bg: 'rgba(255,159,28,0.16)',  rank: 6  },
+  { id: 'leader',      label: 'リーダー',       color: '#ff6b4a', bg: 'rgba(255,107,74,0.15)',  rank: 7  },
+  { id: 'subleader',   label: 'サブリーダー',   color: '#ff5c8a', bg: 'rgba(255,92,138,0.15)',  rank: 8  },
 ];
 function getRole(id) {
   return ROLES.find(r => r.id === (id || '')) || ROLES[0];
@@ -28,6 +29,79 @@ function sortMembers(members) {
     const rb = getRole(b.role).rank;
     if (ra !== rb) return ra - rb;
     return (a.name || '').localeCompare(b.name || '', 'ja');
+  });
+}
+
+/** 現在の並び替えモード（'role' | 'kana' | 'manual'） */
+function getMemberSort() {
+  const m = state && state.memberSort;
+  return (m === 'kana' || m === 'manual') ? m : 'role';
+}
+
+/** モードに応じてメンバー配列を並べ替えた新配列を返す（manual は保存順のまま） */
+function sortMembersBy(members, mode) {
+  const list = members || [];
+  if (mode === 'manual') return [...list];
+  if (mode === 'kana') {
+    // ※漢字は読み仮名が無いため近似（かな名は正確）
+    return [...list].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ja'));
+  }
+  return sortMembers(list);
+}
+
+/** ドラッグで並んだDOM順(ids)に合わせて元配列を並べ替えて返す */
+function reorderByIds(arr, ids) {
+  const map = new Map(arr.map(x => [x.id, x]));
+  const next = ids.map(id => map.get(id)).filter(Boolean);
+  arr.forEach(x => { if (!ids.includes(x.id)) next.push(x); }); // 念のため漏れを追加
+  return next;
+}
+
+/**
+ * コンテナ内の行（直下の .member-item）を、グリップ(handle)のドラッグで並び替える。
+ * ポインタイベントなのでマウス・タッチ両対応。idAttr は 'mid' か 'rid'。
+ * 並び替え確定時に onReorder(新ID配列) を呼ぶ。
+ */
+function enableDragSort(container, idAttr, onReorder) {
+  container.querySelectorAll('[data-drag-handle]').forEach(handle => {
+    handle.addEventListener('pointerdown', e => {
+      const row = handle.closest('.member-item');
+      if (!row) return;
+      e.preventDefault();
+      let moved = false;
+      row.classList.add('dragging');
+      document.body.classList.add('dragging-active');
+
+      // 行をDOM移動すると handle 上の pointer capture が外れて pointermove が
+      // 届かなくなるため、移動イベントは document で受ける（マウス・タッチ両対応）。
+      const onMove = ev => {
+        ev.preventDefault();
+        moved = true;
+        row.style.pointerEvents = 'none';          // 真下の行を拾うため一時的に透過
+        const under = document.elementFromPoint(ev.clientX, ev.clientY);
+        row.style.pointerEvents = '';
+        const target = under && under.closest('.member-item');
+        if (!target || target === row || target.parentNode !== container) return;
+        const rect = target.getBoundingClientRect();
+        const before = ev.clientY < rect.top + rect.height / 2;
+        container.insertBefore(row, before ? target : target.nextSibling);
+      };
+      const onUp = () => {
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+        document.removeEventListener('pointercancel', onUp);
+        row.classList.remove('dragging');
+        document.body.classList.remove('dragging-active');
+        if (!moved) return;                         // 単なるクリックなら並び替えしない
+        const ids = [...container.children]
+          .filter(c => c.dataset && c.dataset[idAttr])
+          .map(c => c.dataset[idAttr]);
+        onReorder(ids);
+      };
+      document.addEventListener('pointermove', onMove, { passive: false });
+      document.addEventListener('pointerup', onUp);
+      document.addEventListener('pointercancel', onUp);
+    });
   });
 }
 
@@ -205,9 +279,11 @@ function renderSidebar() {
     el.innerHTML = state.events.slice().reverse().map(ev => {
       const { balance } = calcSummary(ev);
       const active = (currentPage === 'events' && ev.id === currentEventId) ? 'active' : '';
+      const done = ev.completed ? ' completed' : '';
+      const check = ev.completed ? '<span class="event-item-check">✓</span>' : '';
       return `
-        <div class="event-item ${active}" data-id="${ev.id}" role="button" tabindex="0">
-          <div class="event-item-name">${esc(ev.name)}</div>
+        <div class="event-item ${active}${done}" data-id="${ev.id}" role="button" tabindex="0">
+          <div class="event-item-name">${check}${esc(ev.name)}</div>
           <div class="event-item-meta">
             <span>${ev.date ? dateLabel(ev.date) : '日付未設定'}</span>
             <span class="event-item-balance" style="color:${balance < 0 ? 'var(--red)' : 'var(--green)'}">${fmt(balance)}</span>
@@ -264,7 +340,7 @@ function renderDetail() {
   empty.classList.add('hidden');
   detail.classList.remove('hidden');
 
-  const { carryover, collected, spent, balance } = calcSummary(ev);
+  const { carryover, collected, spent, balance, cashBalance, unpaidAmount } = calcSummary(ev);
 
   // タイトル
   document.getElementById('detailTitle').textContent = ev.name;
@@ -281,6 +357,23 @@ function renderDetail() {
 
   // 一人当たり予算
   renderPerPerson(ev);
+
+  // 次回への繰越金（実収ベース = 実際に集まった現金）
+  const cfAmount = document.getElementById('carryForwardAmount');
+  cfAmount.textContent = fmt(cashBalance);
+  cfAmount.style.color = cashBalance < 0 ? 'var(--red)' : 'var(--green-deep)';
+  document.getElementById('carryForwardSub').textContent =
+    unpaidAmount > 0
+      ? `未払い ${fmt(unpaidAmount)} は含みません（実際に集まった現金）`
+      : '実際に集まった現金（手元）';
+
+  // 完了（精算済み）状態
+  const completed = !!ev.completed;
+  detail.classList.toggle('is-completed', completed);
+  document.getElementById('completeFlag').hidden = !completed;
+  const tgl = document.getElementById('btnToggleComplete');
+  tgl.textContent = completed ? '🔓 再オープン' : '✅ 精算完了にする';
+  tgl.classList.toggle('is-complete', completed);
 
   // フォーム
   document.getElementById('eventName').value = ev.name || '';
@@ -336,7 +429,10 @@ function renderExpenses(ev) {
 function renderMembers(ev) {
   const el = document.getElementById('memberList');
   const toolbar = document.getElementById('memberToolbar');
-  const all = sortMembers(ev.members || []);
+  const mode = getMemberSort();
+  const all = sortMembersBy(ev.members || [], mode);
+  // 手動並び替えはフィルタOFFの全件表示時のみ有効（部分表示だと並びが曖昧になるため）
+  const canDrag = mode === 'manual' && !showUnpaidOnly;
 
   // 未払いサマリー＆フィルタ用ツールバー
   const attending = all.filter(m => m.attending !== false);
@@ -348,6 +444,7 @@ function renderMembers(ev) {
       document.getElementById('unpaidSummary').textContent =
         unpaid.length ? `未払い ${unpaid.length}名 ／ ${fmt(unpaidSum)}` : '全員支払い済み 🎉';
       document.getElementById('filterUnpaid').checked = showUnpaidOnly;
+      document.getElementById('memberSortSelect').value = mode;
     } else {
       toolbar.style.display = 'none';
     }
@@ -369,8 +466,12 @@ function renderMembers(ev) {
     const paid = !!m.paid;
     const initials = m.name.slice(0, 2);
     const role = getRole(m.role);
+    const handle = canDrag
+      ? '<button class="drag-handle" data-drag-handle aria-label="ドラッグして並び替え" title="ドラッグして並び替え">⠿</button>'
+      : '';
     return `
-      <div class="member-item" data-mid="${m.id}">
+      <div class="member-item${canDrag ? ' draggable' : ''}" data-mid="${m.id}">
+        ${handle}
         <div class="member-avatar" style="background:linear-gradient(135deg,${role.color}cc,${role.color}88)">${esc(initials)}</div>
         <div style="min-width:0">
           <div class="member-name">${esc(m.name)}</div>
@@ -449,6 +550,16 @@ function renderMembers(ev) {
       );
     });
   });
+
+  // 手動並び替え（ドラッグ）
+  if (canDrag) {
+    enableDragSort(el, 'mid', ids => {
+      const ev2 = currentEvent();
+      if (!ev2) return;
+      ev2.members = reorderByIds(ev2.members, ids);
+      saveState(); render();
+    });
+  }
 }
 
 // =============================================================
@@ -469,7 +580,8 @@ function splitEqually() {
     () => {
       attending.forEach(m => { m.amount = per; });
       saveState(); render();
-    }
+    },
+    { okText: '設定する', okColor: 'var(--blue)' }
   );
 }
 
@@ -482,21 +594,27 @@ function openNewEventModal() {
   document.getElementById('newEventCarry').value = '';
   document.getElementById('newEventAutoAdd').checked = true;
 
-  // 前回残高の自動繰越
+  // 前回残高の自動繰越（精算完了したイベント優先。なければ最後のイベント）
   const prevEvents = state.events;
   const carryField = document.getElementById('carryFromPrevField');
   const carryCheck = document.getElementById('carryFromPrev');
   const carryHint = document.getElementById('carryFromPrevHint');
   if (prevEvents.length > 0) {
-    const last = prevEvents[prevEvents.length - 1];
-    const { balance } = calcSummary(last);
+    const completedEvents = prevEvents.filter(e => e.completed);
+    const src = completedEvents.length
+      ? completedEvents[completedEvents.length - 1]
+      : prevEvents[prevEvents.length - 1];
+    // 繰越は実収ベース（実際に集まった現金）
+    const { cashBalance } = calcSummary(src);
     carryField.style.display = '';
-    carryHint.textContent = `前回「${last.name}」の残高: ${fmt(balance)}`;
+    carryHint.textContent =
+      `前回「${src.name}」の手元残高（実収）: ${fmt(cashBalance)}` +
+      (src.completed ? '（精算完了）' : '');
     carryCheck.checked = true;
     // チェック時に繰越額フィールドを連動
     const syncCarry = () => {
       if (carryCheck.checked) {
-        document.getElementById('newEventCarry').value = balance;
+        document.getElementById('newEventCarry').value = cashBalance;
         document.getElementById('newEventCarry').disabled = true;
       } else {
         document.getElementById('newEventCarry').value = '';
@@ -533,7 +651,7 @@ function createEvent() {
     id: uid(), name: m.name, attending: true, amount: 0, paid: false, registeredId: m.id
   })) : [];
 
-  const ev = { id: uid(), name, date, note: '', carryover, expenses: [], members };
+  const ev = { id: uid(), name, date, note: '', carryover, completed: false, completedAt: null, expenses: [], members };
   state.events.push(ev);
   currentEventId = ev.id;
   saveState();
@@ -658,6 +776,35 @@ function saveEventSettings() {
   saveState(); render();
 }
 
+/** イベントの「精算完了」を切り替える（軽量トグル） */
+function toggleComplete() {
+  const ev = currentEvent();
+  if (!ev) return;
+  if (ev.completed) {
+    // 再オープン（確認不要）
+    ev.completed = false;
+    ev.completedAt = null;
+    saveState(); render();
+    return;
+  }
+  const { unpaidAmount } = calcSummary(ev);
+  const done = () => {
+    ev.completed = true;
+    ev.completedAt = todayISO();
+    saveState(); render();
+  };
+  if (unpaidAmount > 0) {
+    openConfirmModal(
+      '精算完了にしますか？',
+      `未払いが ${fmt(unpaidAmount)} 残っています。次回への繰越は「実際に集まった現金」で計算されます。`,
+      done,
+      { okText: '完了にする', okColor: 'var(--blue)' }
+    );
+  } else {
+    done();
+  }
+}
+
 function deleteEvent() {
   const ev = currentEvent();
   if (!ev) return;
@@ -677,10 +824,15 @@ function deleteEvent() {
 // =============================================================
 let confirmCallback = null;
 
-function openConfirmModal(title, message, onConfirm) {
+function openConfirmModal(title, message, onConfirm, opts) {
+  opts = opts || {};
   confirmCallback = onConfirm;
   document.getElementById('confirmTitle').textContent = title;
   document.getElementById('confirmMessage').textContent = message;
+  // OKボタンは毎回リセット（既定は破壊的操作＝赤「削除する」）
+  const ok = document.getElementById('btnConfirmOk');
+  ok.textContent = opts.okText || '削除する';
+  ok.style.background = opts.okColor || 'var(--red)';
   document.getElementById('modalConfirm').classList.remove('hidden');
 }
 function closeConfirmModal() {
@@ -701,6 +853,8 @@ function normalizeState(raw) {
       date: typeof e.date === 'string' ? e.date : '',
       note: typeof e.note === 'string' ? e.note : '',
       carryover: Number(e.carryover) || 0,
+      completed: !!e.completed,
+      completedAt: typeof e.completedAt === 'string' ? e.completedAt : null,
       expenses: Array.isArray(e.expenses)
         ? e.expenses.filter(x => x && typeof x === 'object').map(x => ({
             id: x.id || uid(),
@@ -729,6 +883,9 @@ function normalizeState(raw) {
     }));
   }
   if (raw && typeof raw.lastBackupAt === 'string') out.lastBackupAt = raw.lastBackupAt;
+  if (raw && (raw.memberSort === 'kana' || raw.memberSort === 'manual' || raw.memberSort === 'role')) {
+    out.memberSort = raw.memberSort;
+  }
   return out;
 }
 
@@ -774,7 +931,7 @@ function importBackup(file) {
 // PDF レポート（印刷 → PDFとして保存）
 // =============================================================
 function buildReportHTML(ev) {
-  const { carryover, collected, spent, balance } = calcSummary(ev);
+  const { carryover, collected, spent, balance, cashBalance } = calcSummary(ev);
   const attending = (ev.members || []).filter(m => m.attending !== false);
   const n = attending.length;
   const { perPerson } = calcPerPerson(ev);
@@ -799,9 +956,9 @@ function buildReportHTML(ev) {
     ? ev.expenses.map(e => `<tr><td>${esc(e.desc)}</td><td class="num">${fmt(e.amount)}</td></tr>`).join('')
     : '<tr><td colspan="2" class="muted">支出はありません</td></tr>';
 
-  // 参加者
+  // 参加者（画面と同じ並び順で出力）
   const memRows = (ev.members && ev.members.length)
-    ? sortMembers(ev.members).map(m => {
+    ? sortMembersBy(ev.members, getMemberSort()).map(m => {
         const att = m.attending !== false;
         const role = getRole(m.role);
         return `<tr>
@@ -816,7 +973,7 @@ function buildReportHTML(ev) {
 
   return `
     <div class="pr-head">
-      <div class="pr-title">${esc(ev.name)}</div>
+      <div class="pr-title">${esc(ev.name)}${ev.completed ? ' <span class="pr-done">✓ 精算完了</span>' : ''}</div>
       <div class="pr-sub">${esc(dateLabel(ev.date))}${ev.note ? ' ・ ' + esc(ev.note) : ''}</div>
     </div>
 
@@ -831,6 +988,7 @@ function buildReportHTML(ev) {
       参加 ${n}名 ／ 一人当たり予算 ${n > 0 ? fmt(perPerson) : '—'}
       ${settle ? '<br>' + settle : ''}
       ${unpaid.length ? `<br>未払い ${unpaid.length}名 ／ ${fmt(unpaidSum)}` : ''}
+      <br>次回への繰越金（実収）: <b>${fmt(cashBalance)}</b>
     </div>
 
     <div class="pr-section">支出明細</div>
@@ -981,15 +1139,28 @@ function renderMembersPage() {
   page.classList.remove('hidden');
 
   const el = document.getElementById('globalMemberList');
+  const gToolbar = document.getElementById('globalMemberToolbar');
+  const mode = getMemberSort();
   if (!state.members.length) {
+    if (gToolbar) gToolbar.style.display = 'none';
     el.innerHTML = '<div class="list-empty">登録済みメンバーはいません。<br>上のフォームから追加してください。</div>';
     return;
   }
+  if (gToolbar) {
+    gToolbar.style.display = '';
+    document.getElementById('globalMemberCount').textContent = `${state.members.length}名`;
+    document.getElementById('globalSortSelect').value = mode;
+  }
+  const canDrag = mode === 'manual';
 
-  el.innerHTML = sortMembers(state.members).map(m => {
+  el.innerHTML = sortMembersBy(state.members, mode).map(m => {
     const role = getRole(m.role);
+    const handle = canDrag
+      ? '<button class="drag-handle" data-drag-handle aria-label="ドラッグして並び替え" title="ドラッグして並び替え">⠿</button>'
+      : '';
     return `
-    <div class="member-item" data-rid="${m.id}">
+    <div class="member-item${canDrag ? ' draggable' : ''}" data-rid="${m.id}">
+      ${handle}
       <div class="member-avatar" style="background:linear-gradient(135deg,${role.color}cc,${role.color}88)">${esc(m.name.slice(0, 2))}</div>
       <div style="flex:1;min-width:0">
         <div class="member-name">${esc(m.name)}</div>
@@ -1035,6 +1206,14 @@ function renderMembersPage() {
       );
     });
   });
+
+  // 手動並び替え（ドラッグ）
+  if (canDrag) {
+    enableDragSort(el, 'rid', ids => {
+      state.members = reorderByIds(state.members, ids);
+      saveState(); render();
+    });
+  }
 }
 
 function addGlobalMember() {
@@ -1091,9 +1270,31 @@ function closeMobileSidebar() {
 }
 
 // =============================================================
+// スプラッシュ（起動画面）
+// =============================================================
+function initSplash() {
+  const splash = document.getElementById('splashScreen');
+  if (!splash) return;
+  let dismissed = false;
+  const enter = () => {
+    if (dismissed) return;
+    dismissed = true;
+    splash.classList.add('is-hiding');
+    // フェード後にDOMから除去（印刷やフォーカスの邪魔をしない）
+    setTimeout(() => splash.remove(), 600);
+  };
+  // クリック／タップで本体へ（自動では切り替えない）
+  splash.addEventListener('click', enter);
+  // キーボード操作用にボタンへフォーカス（Enter / Space で開始）
+  const startBtn = document.getElementById('splashStart');
+  if (startBtn) { try { startBtn.focus({ preventScroll: true }); } catch (e) {} }
+}
+
+// =============================================================
 // INIT
 // =============================================================
 document.addEventListener('DOMContentLoaded', () => {
+  initSplash();
   loadState();
 
   // サイドバー: 新規イベント
@@ -1140,8 +1341,14 @@ document.addEventListener('DOMContentLoaded', () => {
     renderDetail();
   });
 
+  // メンバー並び替え（両セレクタは同じ state.memberSort を共有）
+  const onSortChange = e => { state.memberSort = e.target.value; saveState(); render(); };
+  document.getElementById('memberSortSelect').addEventListener('change', onSortChange);
+  document.getElementById('globalSortSelect').addEventListener('change', onSortChange);
+
   // イベント設定
   document.getElementById('btnSaveEvent').addEventListener('click', saveEventSettings);
+  document.getElementById('btnToggleComplete').addEventListener('click', toggleComplete);
   document.getElementById('btnDeleteEvent').addEventListener('click', deleteEvent);
   document.getElementById('btnPrintReport').addEventListener('click', printReport);
   // 標準の印刷（Cmd/Ctrl+P や共有→印刷）でも正しいレポートを出す
