@@ -11,8 +11,9 @@ const ROLES = [
   { id: 'head',        label: '室長',           color: '#12b5c9', bg: 'rgba(18,181,201,0.15)',  rank: 4  },
   { id: 'manager',     label: 'マネージャー',   color: '#1bc47d', bg: 'rgba(27,196,125,0.15)',  rank: 5  },
   { id: 'chief',       label: 'チーフ',         color: '#ff9f1c', bg: 'rgba(255,159,28,0.16)',  rank: 6  },
-  { id: 'leader',      label: 'リーダー',       color: '#ff6b4a', bg: 'rgba(255,107,74,0.15)',  rank: 7  },
-  { id: 'subleader',   label: 'サブリーダー',   color: '#ff5c8a', bg: 'rgba(255,92,138,0.15)',  rank: 8  },
+  { id: 'subchief',    label: 'サブチーフ',     color: '#e0a52e', bg: 'rgba(224,165,46,0.16)',  rank: 7  },
+  { id: 'leader',      label: 'リーダー',       color: '#ff6b4a', bg: 'rgba(255,107,74,0.15)',  rank: 8  },
+  { id: 'subleader',   label: 'サブリーダー',   color: '#ff5c8a', bg: 'rgba(255,92,138,0.15)',  rank: 9  },
 ];
 function getRole(id) {
   return ROLES.find(r => r.id === (id || '')) || ROLES[0];
@@ -250,9 +251,10 @@ function currentEvent() {
 
 function calcSummary(ev) {
   const carryover = Number(ev.carryover) || 0;
-  const attending = (ev.members || []).filter(m => m.attending !== false);
-  const collected = attending.reduce((s, m) => s + (Number(m.amount) || 0), 0);
-  const paidCollected = attending
+  // 集金は参加・不参加を問わず全メンバーが対象（不参加者からも集金できる）
+  const members = ev.members || [];
+  const collected = members.reduce((s, m) => s + (Number(m.amount) || 0), 0);
+  const paidCollected = members
     .filter(m => m.paid)
     .reduce((s, m) => s + (Number(m.amount) || 0), 0);
   const spent = (ev.expenses || [])
@@ -477,14 +479,17 @@ function renderMembers(ev) {
   const canDrag = mode === 'manual' && !showUnpaidOnly;
 
   // 未払いサマリー＆フィルタ用ツールバー
-  const attending = all.filter(m => m.attending !== false);
-  const unpaid = attending.filter(m => !m.paid);
+  // 集金対象は参加・不参加を問わず「金額が入っている人」。
+  const owes = m => (Number(m.amount) || 0) > 0;
+  const collectors = all.filter(owes);
+  const unpaid = collectors.filter(m => !m.paid);
   if (toolbar) {
     if (all.length) {
       toolbar.style.display = '';
       const unpaidSum = unpaid.reduce((s, m) => s + (Number(m.amount) || 0), 0);
       document.getElementById('unpaidSummary').textContent =
-        unpaid.length ? `未払い ${unpaid.length}名 ／ ${fmt(unpaidSum)}` : '全員支払い済み 🎉';
+        unpaid.length ? `未払い ${unpaid.length}名 ／ ${fmt(unpaidSum)}`
+          : (collectors.length ? '全員支払い済み 🎉' : '集金額が未設定です');
       document.getElementById('filterUnpaid').checked = showUnpaidOnly;
       document.getElementById('memberSortSelect').value = mode;
     } else {
@@ -497,9 +502,9 @@ function renderMembers(ev) {
     return;
   }
 
-  const list = showUnpaidOnly ? attending.filter(m => !m.paid) : all;
+  const list = showUnpaidOnly ? unpaid : all;
   if (!list.length) {
-    el.innerHTML = '<div class="list-empty">未払いの参加者はいません 🎉</div>';
+    el.innerHTML = '<div class="list-empty">未払いの人はいません 🎉</div>';
     return;
   }
 
@@ -512,7 +517,7 @@ function renderMembers(ev) {
       ? '<button class="drag-handle" data-drag-handle aria-label="ドラッグして並び替え" title="ドラッグして並び替え">⠿</button>'
       : '';
     return `
-      <div class="member-item${canDrag ? ' draggable' : ''}" data-mid="${m.id}">
+      <div class="member-item${canDrag ? ' draggable' : ''}${attending ? '' : ' not-attending'}" data-mid="${m.id}">
         ${handle}
         <div class="member-avatar" style="background:linear-gradient(135deg,${role.color}cc,${role.color}88)">${esc(initials)}</div>
         <div style="min-width:0">
@@ -524,7 +529,6 @@ function renderMembers(ev) {
             <button class="attend-btn yes ${attending ? 'active' : ''}" data-mid="${m.id}" data-v="true">参加</button>
             <button class="attend-btn no ${!attending ? 'active' : ''}" data-mid="${m.id}" data-v="false">不参加</button>
           </div>
-          ${attending ? `
           <div class="amount-field">
             <span class="amount-prefix">¥</span>
             <input class="amount-input" type="number" min="0" placeholder="0"
@@ -532,7 +536,7 @@ function renderMembers(ev) {
           </div>
           <button class="paid-badge ${paid ? 'paid' : 'unpaid'}" data-mid="${m.id}" data-toggle-paid title="クリックで支払状況を切替">
             ${paid ? '✓ 済' : '未払'}
-          </button>` : ''}
+          </button>
         </div>
         <button class="member-remove" data-mid="${m.id}" title="削除">✕</button>
       </div>`;
@@ -544,7 +548,7 @@ function renderMembers(ev) {
       const mem = ev2.members.find(m => m.id === btn.dataset.mid);
       if (!mem) return;
       mem.attending = btn.dataset.v === 'true';
-      if (!mem.attending) { mem.paid = false; mem.amount = 0; }
+      // 不参加にしても集金額・支払状況は保持（不参加者からも集金できる）
       saveState(); render();
     });
   });
@@ -611,14 +615,19 @@ function splitEqually() {
   const ev = currentEvent();
   if (!ev) return;
   const { carryover, spent } = calcSummary(ev);
-  const attending = (ev.members || []).filter(m => m.attending !== false);
+  const members = ev.members || [];
+  const attending = members.filter(m => m.attending !== false);
   const n = attending.length;
   if (n === 0) { alert('参加者がいません。先にメンバーを追加してください。'); return; }
-  const need = Math.max(0, spent - carryover); // 集金で賄う必要額
+  // 不参加者からの集金分は先に充当し、残りを参加者で均等割りする
+  const fromAbsent = members
+    .filter(m => m.attending === false)
+    .reduce((s, m) => s + (Number(m.amount) || 0), 0);
+  const need = Math.max(0, spent - carryover - fromAbsent); // 集金で賄う必要額
   const per = Math.ceil(need / n);             // 不足が出ないよう切り上げ
   openConfirmModal(
     '割り勘で一括入力しますか？',
-    `参加者 ${n}名 の集金額をそれぞれ ${fmt(per)} に設定します（支出 ${fmt(spent)} − 繰越 ${fmt(carryover)} を均等割り）。手入力した金額は上書きされます。`,
+    `参加者 ${n}名 の集金額をそれぞれ ${fmt(per)} に設定します（支出 ${fmt(spent)} − 繰越 ${fmt(carryover)}${fromAbsent ? ' − 不参加者の集金 ' + fmt(fromAbsent) : ''} を均等割り）。手入力した金額は上書きされます。`,
     () => {
       attending.forEach(m => { m.amount = per; });
       saveState(); render();
@@ -978,8 +987,8 @@ function buildReportHTML(ev) {
   const n = attending.length;
   const { perPerson } = calcPerPerson(ev);
 
-  // 未払い集計
-  const unpaid = attending.filter(m => !m.paid);
+  // 未払い集計（参加・不参加を問わず、金額が入っている未払い者）
+  const unpaid = (ev.members || []).filter(m => (Number(m.amount) || 0) > 0 && !m.paid);
   const unpaidSum = unpaid.reduce((s, m) => s + (Number(m.amount) || 0), 0);
 
   // 精算（残高を参加者で割る）。未集金があると手元現金と残高が一致せず
@@ -1003,12 +1012,14 @@ function buildReportHTML(ev) {
     ? sortMembersBy(ev.members, getMemberSort()).map(m => {
         const att = m.attending !== false;
         const role = getRole(m.role);
+        // 不参加でも集金額が入っていれば金額・支払を表示する
+        const showMoney = att || (Number(m.amount) || 0) > 0;
         return `<tr>
           <td>${esc(m.name)}</td>
           <td>${m.role ? esc(role.label) : '—'}</td>
           <td>${att ? '参加' : '不参加'}</td>
-          <td class="num">${att ? fmt(m.amount) : '—'}</td>
-          <td>${att ? (m.paid ? '✓ 済' : '未払') : '—'}</td>
+          <td class="num">${showMoney ? fmt(m.amount) : '—'}</td>
+          <td>${showMoney ? (m.paid ? '✓ 済' : '未払') : '—'}</td>
         </tr>`;
       }).join('')
     : '<tr><td colspan="5" class="muted">参加者はいません</td></tr>';
@@ -1126,7 +1137,7 @@ function renderDashboard() {
   const rows = evs.slice().reverse().map(ev => {
     const s = calcSummary(ev);
     const attendCount = (ev.members || []).filter(m => m.attending !== false).length;
-    const unpaidCount = (ev.members || []).filter(m => m.attending !== false && !m.paid).length;
+    const unpaidCount = (ev.members || []).filter(m => (Number(m.amount) || 0) > 0 && !m.paid).length;
     return `<tr class="dash-row" data-id="${ev.id}" role="button" tabindex="0">
       <td class="dash-name">${esc(ev.name)}</td>
       <td>${ev.date ? esc(dateLabel(ev.date)) : '—'}</td>

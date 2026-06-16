@@ -799,6 +799,10 @@ body {
 }
 .member-item:last-child { border-bottom: none; }
 .member-item:hover { background: var(--bg-hover); }
+/* 不参加でも集金対象。淡色にして区別しつつ金額・支払欄は残す */
+.member-item.not-attending { background: rgba(176,168,158,0.06); }
+.member-item.not-attending .member-avatar { filter: grayscale(0.55); opacity: 0.62; }
+.member-item.not-attending .member-name { color: var(--text-secondary); }
 .member-avatar {
   width: 40px; height: 40px;
   border-radius: 14px;
