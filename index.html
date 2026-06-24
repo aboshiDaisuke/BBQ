@@ -54,6 +54,8 @@
   </button>
 
   <div class="sidebar-footer">
+    <button class="sidebar-action" id="btnCloud">☁️ クラウド同期</button>
+    <div class="sidebar-backup-info" id="cloudInfo"></div>
     <button class="sidebar-action" id="btnExport">📤 バックアップ</button>
     <label class="sidebar-action" for="importFile">📥 復元</label>
     <input type="file" id="importFile" accept=".json" style="display:none">
@@ -391,12 +393,57 @@
   </div>
 </div>
 
+<!-- ===== モーダル: クラウド同期 ===== -->
+<div id="modalCloud" class="modal-overlay hidden">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h2 class="modal-title">☁️ クラウド同期</h2>
+    </div>
+    <div class="modal-body">
+      <!-- 未設定のとき -->
+      <div id="cloudNotConfigured" style="display:none">
+        <p class="cloud-note">クラウド同期はまだ設定されていません。<code>supabase-config.js</code> に接続情報（URL と anon key）を設定すると使えるようになります。設定がなくても、アプリはこれまで通り端末内で動きます。</p>
+      </div>
+      <!-- ログアウト中 -->
+      <div id="cloudLoggedOut" style="display:none">
+        <p class="cloud-note">あらかじめ決めたIDとパスワードでログインすると、データがクラウドにも自動でバックアップされます。</p>
+        <div class="field">
+          <label class="field-label">ログインID</label>
+          <input type="text" id="cloudEmail" class="field-input" autocomplete="username" placeholder="ID を入力">
+        </div>
+        <div class="field">
+          <label class="field-label">パスワード</label>
+          <input type="password" id="cloudPassword" class="field-input" autocomplete="current-password" placeholder="パスワード">
+        </div>
+        <p class="cloud-error" id="cloudError" style="display:none"></p>
+      </div>
+      <!-- ログイン中 -->
+      <div id="cloudLoggedIn" style="display:none">
+        <p class="cloud-note">ログイン中: <strong id="cloudUserEmail"></strong></p>
+        <p class="cloud-note" id="cloudSyncState"></p>
+        <div class="cloud-actions">
+          <button class="btn-soft-sm" id="btnCloudPush">⬆️ 今すぐクラウドへ保存</button>
+          <button class="btn-soft-sm" id="btnCloudPull">⬇️ クラウドから読み込み</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" id="btnCloudClose">閉じる</button>
+      <button class="btn-secondary" id="btnCloudLogout" style="display:none">ログアウト</button>
+      <button class="btn-primary" id="btnCloudLogin" style="display:none">ログイン</button>
+    </div>
+  </div>
+</div>
+
 <!-- サイドバーオーバーレイ（モバイル） -->
 <div class="sidebar-overlay hidden" id="sidebarOverlay"></div>
 
 <!-- ===== 印刷用レポート（画面では非表示、印刷/PDF時のみ表示） ===== -->
 <div id="printReport" class="print-report"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
 <script src="app.js"></script>
+<script src="cloud.js"></script>
 </body>
 </html>

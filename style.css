@@ -270,6 +270,32 @@ body {
 }
 .sidebar-action:hover { background: var(--bg-hover); color: var(--text-primary); }
 
+/* クラウド同期 */
+.cloud-note {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.7;
+  margin: 0 0 12px;
+}
+.cloud-note code {
+  background: var(--bg-hover);
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 0.85em;
+}
+.cloud-error {
+  color: var(--red);
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin: 4px 0 0;
+}
+.cloud-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
 /* ===================================================
    MOBILE HEADER
    =================================================== */

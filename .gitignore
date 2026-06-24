@@ -2,3 +2,7 @@
 # 加工済みの assets/mascot.png のみ管理する
 bbq.zip
 ChatGPT Image*.png
+
+# Supabase CLI のローカル一時ファイル（接続情報など）
+supabase/
+.supabase_token

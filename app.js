@@ -126,6 +126,8 @@ const STORAGE_KEY = 'nomikai_v2';
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ state, currentEventId }));
+  // ログイン中ならクラウドにも自動バックアップ（cloud.js が定義）
+  if (window.__cloudPush) window.__cloudPush();
 }
 function loadState() {
   try {
