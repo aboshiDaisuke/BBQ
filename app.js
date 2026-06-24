@@ -1021,7 +1021,7 @@ function buildReportHTML(ev) {
           <td>${m.role ? esc(role.label) : '—'}</td>
           <td>${att ? '参加' : '不参加'}</td>
           <td class="num">${showMoney ? fmt(m.amount) : '—'}</td>
-          <td>${showMoney ? (m.paid ? '✓ 済' : '未払') : '—'}</td>
+          <td>${showMoney ? (m.paid ? '<span class="pr-paid">✓ 済</span>' : '未払') : '—'}</td>
         </tr>`;
       }).join('')
     : '<tr><td colspan="5" class="muted">参加者はいません</td></tr>';

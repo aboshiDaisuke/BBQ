@@ -1221,6 +1221,13 @@ body.dragging-active { user-select: none; -webkit-user-select: none; cursor: gra
   .pr-table tfoot td { font-weight: 800; border-top: 1.5px solid #999; border-bottom: none; }
   .pr-table .muted { color: #999; text-align: center; }
 
+  /* 支払い済みの色分けバッジ（未払いは色なし） */
+  .pr-paid {
+    display: inline-block; font-weight: 800; font-size: 12px;
+    color: #0f9d66; background: #e3f6ec;
+    border-radius: 999px; padding: 2px 10px;
+  }
+
   .pr-foot {
     margin-top: 34px; padding-top: 12px; border-top: 1px solid #ccc;
     font-size: 11px; color: #888; text-align: right;
