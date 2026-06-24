@@ -1,0 +1,33 @@
+name: Supabase keep-alive
+
+# Supabase 無料プランは「7日間アクセスがない」と自動停止する。
+# 2日おきに DB へ軽いリクエストを送り、停止タイマーをリセットし続ける。
+# （anon key は公開して安全な鍵。RLS によりデータ自体は守られる）
+
+on:
+  schedule:
+    - cron: '0 3 */2 * *'   # 2日おき 03:00 UTC（= 日本時間 正午ごろ）
+  workflow_dispatch: {}      # 手動実行も可能
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST API
+        env:
+          SUPABASE_URL: https://pywsrbnrazuctagqcxvq.supabase.co
+          SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB5d3NyYm5yYXp1Y3RhZ3FjeHZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyODMyODcsImV4cCI6MjA5Nzg1OTI4N30._VDTANDT7vYhaJ8xy9OGwmWmQbKr2hPpv2GrZXzpv8g
+        run: |
+          echo "Pinging Supabase to keep the project active..."
+          code=$(curl -s -o /dev/null -w "%{http_code}" \
+            "$SUPABASE_URL/rest/v1/app_state?select=user_id&limit=1" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY")
+          echo "HTTP status: $code"
+          # 200(データ有) / 200相当の空配列 などが返れば成功。
+          if [ "$code" -ge 200 ] && [ "$code" -lt 400 ]; then
+            echo "Keep-alive OK"
+          else
+            echo "Keep-alive failed (HTTP $code)"
+            exit 1
+          fi
