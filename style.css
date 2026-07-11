@@ -386,10 +386,14 @@ body {
    =================================================== */
 .detail-titlebar {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
   margin-bottom: 26px;
+}
+.detail-titlebar > :first-child {
+  min-width: 0;
+  max-width: 100%;
 }
 .detail-title {
   font-family: var(--font);
@@ -397,8 +401,10 @@ body {
   font-weight: 900;
   letter-spacing: -0.5px;
   color: var(--text-primary);
-  line-height: 1.25;
-  text-wrap: pretty;
+  line-height: 1.35;
+  word-break: keep-all;
+  line-break: strict;
+  overflow-wrap: break-word;
 }
 .detail-subtitle {
   font-size: 0.9rem;
@@ -574,9 +580,97 @@ body {
 }
 .btn-soft-sm.is-complete:hover { background: rgba(20,184,122,0.22); border-color: var(--green); }
 
-/* 完了イベントは本体を少し落ち着いたトーンに（操作は可能） */
+/* 完了イベント：落ち着いたトーン + 編集ロック */
 #eventDetail.is-completed .summary-grid,
-#eventDetail.is-completed .per-person-bar { opacity: 0.92; }
+#eventDetail.is-completed .per-person-bar,
+#eventDetail.is-completed .carry-forward-bar { opacity: 0.92; }
+#eventDetail.is-locked .btn-icon-circle:disabled,
+#eventDetail.is-locked .btn-soft-sm:disabled,
+#eventDetail.is-locked .attend-btn:disabled,
+#eventDetail.is-locked .paid-badge:disabled,
+#eventDetail.is-locked .field-input:disabled,
+#eventDetail.is-locked .amount-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  filter: grayscale(0.15);
+}
+.completed-lock-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, rgba(20,184,122,0.12), rgba(59,158,255,0.1));
+  border: 2px solid rgba(20,184,122,0.28);
+  color: var(--text-primary);
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.completed-lock-banner.hidden { display: none; }
+
+.autosave-status {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--text-tertiary);
+}
+.autosave-status.is-saving { color: var(--amber); }
+.autosave-status.is-saved { color: var(--green-deep); }
+.autosave-status.is-error { color: var(--red); }
+
+.backup-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 16px 0;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, #fff4e8, #ffe8ef);
+  border: 2px solid rgba(255, 106, 61, 0.28);
+  box-shadow: var(--shadow-sm);
+}
+.backup-banner.hidden { display: none; }
+.backup-banner-text {
+  flex: 1 1 16rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.45;
+}
+.backup-banner-text strong { display: block; margin-bottom: 2px; font-weight: 800; }
+.backup-banner-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn-banner { padding: 10px 16px !important; font-size: 0.84rem !important; }
+
+.member-add-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 12px;
+  align-items: end;
+}
+@media (max-width: 720px) {
+  .member-add-grid { grid-template-columns: 1fr; }
+  .member-add-grid .btn-primary { width: 100%; }
+}
+.field-optional {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  margin-left: 4px;
+}
+.member-kana {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+.member-kana.is-empty {
+  color: var(--text-tertiary);
+  font-weight: 600;
+  opacity: 0.85;
+}
 
 /* サイドバーの完了イベント */
 .event-item.completed .event-item-name { color: var(--text-secondary); }
@@ -740,7 +834,7 @@ body {
 }
 .btn-destructive-sm:hover { background: rgba(245,66,95,0.2); }
 
-.detail-actions { display: flex; gap: 8px; align-items: flex-start; flex-shrink: 0; }
+.detail-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .btn-soft-sm {
   background: #fff;
   color: var(--text-primary);

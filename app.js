@@ -23,13 +23,25 @@ function roleOptionsHTML(selectedId) {
     `<option value="${r.id}" ${r.id === (selectedId || '') ? 'selected' : ''}>${r.label}</option>`
   ).join('');
 }
-/** メンバー配列をランク順→五十音順でソートした新配列を返す */
+/** 五十音ソート用キー（よみがな優先 → 登録メンバーのよみがな → 名前） */
+function memberSortKey(m) {
+  if (!m) return '';
+  const own = (m.kana || '').trim();
+  if (own) return own;
+  if (m.registeredId && state && Array.isArray(state.members)) {
+    const reg = state.members.find(r => r.id === m.registeredId);
+    if (reg && (reg.kana || '').trim()) return reg.kana.trim();
+  }
+  return (m.name || '').trim();
+}
+
+/** メンバー配列をランク順→よみがな/名前順でソートした新配列を返す */
 function sortMembers(members) {
   return [...members].sort((a, b) => {
     const ra = getRole(a.role).rank;
     const rb = getRole(b.role).rank;
     if (ra !== rb) return ra - rb;
-    return (a.name || '').localeCompare(b.name || '', 'ja');
+    return memberSortKey(a).localeCompare(memberSortKey(b), 'ja');
   });
 }
 
@@ -44,10 +56,14 @@ function sortMembersBy(members, mode) {
   const list = members || [];
   if (mode === 'manual') return [...list];
   if (mode === 'kana') {
-    // ※漢字は読み仮名が無いため近似（かな名は正確）
-    return [...list].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ja'));
+    return [...list].sort((a, b) => memberSortKey(a).localeCompare(memberSortKey(b), 'ja'));
   }
   return sortMembers(list);
+}
+
+/** イベントが精算完了で編集ロック中か */
+function isEventLocked(ev) {
+  return !!(ev && ev.completed);
 }
 
 /** ドラッグで並んだDOM順(ids)に合わせて元配列を並べ替えて返す */
@@ -176,13 +192,13 @@ function migrateSampleEventName() {
 /** チュートリアル用のサンプルデータを投入（初回 / 空状態の「サンプルを見る」から呼ぶ） */
 function loadTutorialSample() {
   const reg = [
-    { id: uid(), name: '田中 太郎',  role: 'president' },
-    { id: uid(), name: '佐藤 花子',  role: 'division' },
-    { id: uid(), name: '鈴木 一郎',  role: 'manager' },
-    { id: uid(), name: '高橋 美咲',  role: '' },
+    { id: uid(), name: '田中 太郎',  kana: 'たなか たろう',  role: 'president' },
+    { id: uid(), name: '佐藤 花子',  kana: 'さとう はなこ',  role: 'division' },
+    { id: uid(), name: '鈴木 一郎',  kana: 'すずき いちろう', role: 'manager' },
+    { id: uid(), name: '高橋 美咲',  kana: 'たかはし みさき', role: '' },
   ];
   const mem = (r, amount, paid) => ({
-    id: uid(), name: r.name, role: r.role, registeredId: r.id,
+    id: uid(), name: r.name, kana: r.kana || '', role: r.role, registeredId: r.id,
     attending: true, amount, paid,
   });
   const ev = {
@@ -303,14 +319,18 @@ function calcPerPerson(ev) {
   return { count, totalBudget, perPerson };
 }
 
-/** 集金合計カードの実収/未収サブ表示を更新 */
+/** 集金予定カードの実収/未収サブ表示を更新 */
 function renderCollectedSub(ev) {
   const el = document.getElementById('sumCollectedSub');
   if (!el) return;
-  const { collected, unpaidAmount } = calcSummary(ev);
-  el.textContent = unpaidAmount > 0
-    ? `未集金 ${fmt(unpaidAmount)}`
-    : (collected > 0 ? '全額集金済み' : '');
+  const { collected, unpaidAmount, paidCollected } = calcSummary(ev);
+  if (unpaidAmount > 0) {
+    el.textContent = `実収 ${fmt(paidCollected)} ／ 未集金 ${fmt(unpaidAmount)}`;
+  } else if (collected > 0) {
+    el.textContent = '全額集金済み（予定＝実収）';
+  } else {
+    el.textContent = '未払い含む全員分の予定額';
+  }
 }
 
 /** 一人当たり予算の表示を更新 */
@@ -321,6 +341,55 @@ function renderPerPerson(ev) {
     count > 0
       ? `参加者 ${count}人 ／ 総予算 ${fmt(totalBudget)}`
       : '参加者を追加してください';
+}
+
+/**
+ * イベント詳細の金額サマリーだけを更新（メンバー行は触らない＝入力フォーカス維持）
+ */
+function refreshDetailSummary(ev) {
+  if (!ev) return;
+  const { collected, spent, balance, cashBalance, unpaidAmount, carryover } = calcSummary(ev);
+  const setText = (id, text) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  };
+  setText('sumCarry', fmt(carryover));
+  setText('sumCollected', fmt(collected));
+  setText('sumSpent', fmt(spent));
+  setText('sumBalance', fmt(balance));
+  const balCard = document.getElementById('cardBalance');
+  if (balCard) balCard.classList.toggle('negative', balance < 0);
+  renderCollectedSub(ev);
+  renderPerPerson(ev);
+
+  const cfAmount = document.getElementById('carryForwardAmount');
+  if (cfAmount) {
+    cfAmount.textContent = fmt(cashBalance);
+    cfAmount.style.color = cashBalance < 0 ? 'var(--red)' : 'var(--green-deep)';
+  }
+  const cfSub = document.getElementById('carryForwardSub');
+  if (cfSub) {
+    cfSub.textContent = unpaidAmount > 0
+      ? `未払い ${fmt(unpaidAmount)} は含みません（実際に集まった現金）`
+      : '繰越＋実収（支払済）−支出。未払いは含みません';
+  }
+
+  const unpaidEl = document.getElementById('unpaidSummary');
+  if (unpaidEl) {
+    const members = ev.members || [];
+    const collectors = members.filter(m => (Number(m.amount) || 0) > 0);
+    const unpaid = collectors.filter(m => !m.paid);
+    const unpaidSum = unpaid.reduce((s, m) => s + (Number(m.amount) || 0), 0);
+    unpaidEl.textContent = unpaid.length
+      ? `未払い ${unpaid.length}名 ／ ${fmt(unpaidSum)}`
+      : (collectors.length ? '全員支払い済み 🎉' : '集金額が未設定です');
+  }
+
+  const sideItem = document.querySelector(`.event-item[data-id="${ev.id}"] .event-item-balance`);
+  if (sideItem) {
+    sideItem.textContent = fmt(balance);
+    sideItem.style.color = balance < 0 ? 'var(--red)' : 'var(--green)';
+  }
 }
 
 // =============================================================
@@ -382,11 +451,17 @@ function renderSidebar() {
   // 最終バックアップ日
   const bi = document.getElementById('backupInfo');
   if (bi) {
-    bi.textContent = state.lastBackupAt
-      ? `最終バックアップ: ${dateLabel(state.lastBackupAt)}`
-      : '⚠️ バックアップ未実施';
-    bi.classList.toggle('warn', !state.lastBackupAt);
+    const stale = isBackupStale();
+    if (!state.lastBackupAt) {
+      bi.textContent = '⚠️ バックアップ未実施（データ消失リスクあり）';
+    } else if (stale) {
+      bi.textContent = `⚠️ 最終バックアップ: ${dateLabel(state.lastBackupAt)}（再取得推奨）`;
+    } else {
+      bi.textContent = `最終バックアップ: ${dateLabel(state.lastBackupAt)}`;
+    }
+    bi.classList.toggle('warn', !state.lastBackupAt || stale);
   }
+  updateBackupBanner();
 }
 
 /* ----- Detail ----- */
@@ -435,10 +510,13 @@ function renderDetail() {
       ? `未払い ${fmt(unpaidAmount)} は含みません（実際に集まった現金）`
       : '実際に集まった現金（手元）';
 
-  // 完了（精算済み）状態
+  // 完了（精算済み）状態 → 編集ロック
   const completed = !!ev.completed;
   detail.classList.toggle('is-completed', completed);
+  detail.classList.toggle('is-locked', completed);
   document.getElementById('completeFlag').hidden = !completed;
+  const lockBanner = document.getElementById('completedLockBanner');
+  if (lockBanner) lockBanner.classList.toggle('hidden', !completed);
   const tgl = document.getElementById('btnToggleComplete');
   tgl.textContent = completed ? '🔓 再オープン' : '✅ 精算完了にする';
   tgl.classList.toggle('is-complete', completed);
@@ -448,14 +526,33 @@ function renderDetail() {
   document.getElementById('eventDate').value = ev.date || '';
   document.getElementById('eventCarry').value = ev.carryover != null ? ev.carryover : '';
   document.getElementById('eventNote').value = ev.note || '';
+  applyEventEditLock(ev);
+  const status = document.getElementById('eventSettingsStatus');
+  if (status) status.textContent = completed ? '編集ロック中' : '自動保存';
 
   renderExpenses(ev);
   renderMembers(ev);
 }
 
+/** 精算完了時に入力・操作をロックする */
+function applyEventEditLock(ev) {
+  const locked = isEventLocked(ev);
+  ['eventName', 'eventDate', 'eventCarry', 'eventNote'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = locked;
+  });
+  const addExp = document.getElementById('btnAddExpense');
+  const addMem = document.getElementById('btnAddMember');
+  const split = document.getElementById('btnSplitEqually');
+  if (addExp) addExp.disabled = locked;
+  if (addMem) addMem.disabled = locked;
+  if (split) split.disabled = locked;
+}
+
 /* ----- Expenses ----- */
 function renderExpenses(ev) {
   const el = document.getElementById('expenseList');
+  const locked = isEventLocked(ev);
   if (!ev.expenses || !ev.expenses.length) {
     el.innerHTML = '<div class="list-empty">支出はまだありません</div>';
     return;
@@ -465,10 +562,13 @@ function renderExpenses(ev) {
       <span class="expense-desc">${esc(exp.desc)}</span>
       <div class="expense-right">
         <span class="expense-amount">${fmt(exp.amount)}</span>
+        ${locked ? '' : `
         <button class="expense-btn edit-exp" data-eid="${exp.id}" title="編集">✏️</button>
-        <button class="expense-btn del-exp" data-eid="${exp.id}" title="削除">🗑</button>
+        <button class="expense-btn del-exp" data-eid="${exp.id}" title="削除">🗑</button>`}
       </div>
     </div>`).join('');
+
+  if (locked) return;
 
   el.querySelectorAll('.edit-exp').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -498,9 +598,10 @@ function renderMembers(ev) {
   const el = document.getElementById('memberList');
   const toolbar = document.getElementById('memberToolbar');
   const mode = getMemberSort();
+  const locked = isEventLocked(ev);
   const all = sortMembersBy(ev.members || [], mode);
   // 手動並び替えはフィルタOFFの全件表示時のみ有効（部分表示だと並びが曖昧になるため）
-  const canDrag = mode === 'manual' && !showUnpaidOnly;
+  const canDrag = !locked && mode === 'manual' && !showUnpaidOnly;
 
   // 未払いサマリー＆フィルタ用ツールバー
   // 集金対象は参加・不参加を問わず「金額が入っている人」。
@@ -550,25 +651,32 @@ function renderMembers(ev) {
         </div>
         <div class="member-controls">
           <div class="attend-toggle">
-            <button class="attend-btn yes ${attending ? 'active' : ''}" data-mid="${m.id}" data-v="true">参加</button>
-            <button class="attend-btn no ${!attending ? 'active' : ''}" data-mid="${m.id}" data-v="false">不参加</button>
+            <button class="attend-btn yes ${attending ? 'active' : ''}" data-mid="${m.id}" data-v="true"
+              ${locked ? 'disabled' : ''}>参加</button>
+            <button class="attend-btn no ${!attending ? 'active' : ''}" data-mid="${m.id}" data-v="false"
+              ${locked ? 'disabled' : ''}>不参加</button>
           </div>
           <div class="amount-field">
             <span class="amount-prefix">¥</span>
             <input class="amount-input" type="number" min="0" placeholder="0"
-              value="${m.amount || ''}" data-mid="${m.id}" aria-label="集金額">
+              value="${m.amount || ''}" data-mid="${m.id}" aria-label="集金額"
+              ${locked ? 'disabled' : ''}>
           </div>
-          <button class="paid-badge ${paid ? 'paid' : 'unpaid'}" data-mid="${m.id}" data-toggle-paid title="クリックで支払状況を切替">
+          <button class="paid-badge ${paid ? 'paid' : 'unpaid'}" data-mid="${m.id}" data-toggle-paid
+            title="クリックで支払状況を切替" ${locked ? 'disabled' : ''}>
             ${paid ? '✓ 済' : '未払'}
           </button>
         </div>
-        <button class="member-remove" data-mid="${m.id}" title="削除">✕</button>
+        ${locked ? '' : `<button class="member-remove" data-mid="${m.id}" title="削除">✕</button>`}
       </div>`;
   }).join('');
+
+  if (locked) return;
 
   el.querySelectorAll('.attend-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const ev2 = currentEvent();
+      if (isEventLocked(ev2)) return;
       const mem = ev2.members.find(m => m.id === btn.dataset.mid);
       if (!mem) return;
       mem.attending = btn.dataset.v === 'true';
@@ -580,24 +688,19 @@ function renderMembers(ev) {
   el.querySelectorAll('.amount-input').forEach(inp => {
     inp.addEventListener('input', () => {
       const ev2 = currentEvent();
+      if (isEventLocked(ev2)) return;
       const mem = ev2.members.find(m => m.id === inp.dataset.mid);
       if (!mem) return;
       mem.amount = Number(inp.value) || 0;
       saveState();
-      // サマリーを再描画（メンバーリストは再レンダリングしない）
-      const { collected, balance } = calcSummary(ev2);
-      document.getElementById('sumCollected').textContent = fmt(collected);
-      document.getElementById('sumBalance').textContent = fmt(balance);
-      document.getElementById('cardBalance').classList.toggle('negative', balance < 0);
-      renderCollectedSub(ev2);
-      // 一人当たり予算も更新
-      renderPerPerson(ev2);
+      refreshDetailSummary(ev2);
     });
   });
 
   el.querySelectorAll('[data-toggle-paid]').forEach(btn => {
     btn.addEventListener('click', () => {
       const ev2 = currentEvent();
+      if (isEventLocked(ev2)) return;
       const mem = ev2.members.find(m => m.id === btn.dataset.mid);
       if (!mem) return;
       mem.paid = !mem.paid;
@@ -608,7 +711,7 @@ function renderMembers(ev) {
   el.querySelectorAll('.member-remove').forEach(btn => {
     btn.addEventListener('click', () => {
       const ev2 = currentEvent();
-      if (!ev2) return;
+      if (!ev2 || isEventLocked(ev2)) return;
       const mem = ev2.members.find(m => m.id === btn.dataset.mid);
       openConfirmModal(
         '参加者を削除しますか？',
@@ -625,7 +728,7 @@ function renderMembers(ev) {
   if (canDrag) {
     enableDragSort(el, 'mid', ids => {
       const ev2 = currentEvent();
-      if (!ev2) return;
+      if (!ev2 || isEventLocked(ev2)) return;
       ev2.members = reorderByIds(ev2.members, ids);
       saveState(); render();
     });
@@ -637,7 +740,7 @@ function renderMembers(ev) {
 // =============================================================
 function splitEqually() {
   const ev = currentEvent();
-  if (!ev) return;
+  if (!ev || isEventLocked(ev)) return;
   const { carryover, spent } = calcSummary(ev);
   const members = ev.members || [];
   const attending = members.filter(m => m.attending !== false);
@@ -723,7 +826,14 @@ function createEvent() {
   const autoAdd = document.getElementById('newEventAutoAdd').checked;
 
   const members = autoAdd ? state.members.map(m => ({
-    id: uid(), name: m.name, attending: true, amount: 0, paid: false, registeredId: m.id
+    id: uid(),
+    name: m.name,
+    kana: m.kana || '',
+    role: m.role || '',
+    attending: true,
+    amount: 0,
+    paid: false,
+    registeredId: m.id,
   })) : [];
 
   const ev = { id: uid(), name, date, note: '', carryover, completed: false, completedAt: null, expenses: [], members };
@@ -738,6 +848,7 @@ function createEvent() {
 // EXPENSE MODAL
 // =============================================================
 function openExpenseModal(exp) {
+  if (isEventLocked(currentEvent())) return;
   editingExpenseId = exp ? exp.id : null;
   document.getElementById('expenseModalTitle').textContent = exp ? '支出を編集' : '支出を追加';
   document.getElementById('expenseDesc').value = exp ? exp.desc : '';
@@ -760,7 +871,7 @@ function saveExpense() {
     return;
   }
   const ev = currentEvent();
-  if (!ev) return;
+  if (!ev || isEventLocked(ev)) return;
   if (editingExpenseId) {
     const exp = ev.expenses.find(e => e.id === editingExpenseId);
     if (exp) { exp.desc = desc; exp.amount = amount; }
@@ -774,6 +885,7 @@ function saveExpense() {
 // MEMBER MODAL
 // =============================================================
 function openMemberModal() {
+  if (isEventLocked(currentEvent())) return;
   renderKnownMembers();
   document.getElementById('newMemberName').value = '';
   document.getElementById('modalMember').classList.remove('hidden');
@@ -805,11 +917,18 @@ function renderKnownMembers() {
   el.querySelectorAll('.chip:not(.added)').forEach(chip => {
     chip.addEventListener('click', () => {
       const ev2 = currentEvent();
-      if (!ev2) return;
+      if (!ev2 || isEventLocked(ev2)) return;
+      const reg = state.members.find(m => m.id === chip.dataset.rid);
       ev2.members = ev2.members || [];
       ev2.members.push({
-        id: uid(), name: chip.dataset.name, attending: true,
-        amount: 0, paid: false, registeredId: chip.dataset.rid
+        id: uid(),
+        name: chip.dataset.name,
+        kana: (reg && reg.kana) || '',
+        role: (reg && reg.role) || '',
+        attending: true,
+        amount: 0,
+        paid: false,
+        registeredId: chip.dataset.rid,
       });
       saveState(); render();
       renderKnownMembers(); // リフレッシュ
@@ -818,18 +937,19 @@ function renderKnownMembers() {
 }
 
 function registerNewMember() {
+  if (isEventLocked(currentEvent())) return;
   const name = document.getElementById('newMemberName').value.trim();
   if (!name) return;
   if (state.members.find(m => m.name === name)) {
     if (!confirm(`「${name}」は既に登録されています。別人として追加しますか？`)) return;
   }
   const regId = uid();
-  state.members.push({ id: regId, name });
+  state.members.push({ id: regId, name, kana: '' });
 
   const ev = currentEvent();
   if (ev) {
     ev.members = ev.members || [];
-    ev.members.push({ id: uid(), name, attending: true, amount: 0, paid: false, registeredId: regId });
+    ev.members.push({ id: uid(), name, kana: '', attending: true, amount: 0, paid: false, registeredId: regId });
   }
   document.getElementById('newMemberName').value = '';
   saveState(); render();
@@ -837,18 +957,51 @@ function registerNewMember() {
 }
 
 // =============================================================
-// EVENT SETTINGS
+// EVENT SETTINGS（自動保存）
 // =============================================================
-function saveEventSettings() {
+let eventSettingsTimer = null;
+
+function setEventSettingsStatus(text, cls) {
+  const el = document.getElementById('eventSettingsStatus');
+  if (!el) return;
+  el.textContent = text;
+  el.classList.toggle('is-saving', cls === 'saving');
+  el.classList.toggle('is-saved', cls === 'saved');
+  el.classList.toggle('is-error', cls === 'error');
+}
+
+function scheduleEventSettingsSave() {
   const ev = currentEvent();
-  if (!ev) return;
+  if (!ev || isEventLocked(ev)) return;
+  setEventSettingsStatus('保存中…', 'saving');
+  clearTimeout(eventSettingsTimer);
+  eventSettingsTimer = setTimeout(() => saveEventSettings({ silent: true }), 320);
+}
+
+function saveEventSettings(opts) {
+  opts = opts || {};
+  const ev = currentEvent();
+  if (!ev || isEventLocked(ev)) return;
   const name = document.getElementById('eventName').value.trim();
-  if (!name) return;
+  if (!name) {
+    setEventSettingsStatus('名前を入力してください', 'error');
+    return;
+  }
   ev.name = name;
   ev.date = document.getElementById('eventDate').value;
   ev.carryover = Number(document.getElementById('eventCarry').value) || 0;
   ev.note = document.getElementById('eventNote').value.trim();
-  saveState(); render();
+  saveState();
+  if (opts.silent) {
+    document.getElementById('detailTitle').textContent = ev.name;
+    document.getElementById('detailSubtitle').textContent =
+      dateLabel(ev.date) + (ev.note ? ' · ' + ev.note : '');
+    refreshDetailSummary(ev);
+    renderSidebar();
+    setEventSettingsStatus('自動保存済み', 'saved');
+    return;
+  }
+  render();
 }
 
 /** イベントの「精算完了」を切り替える（軽量トグル） */
@@ -941,6 +1094,7 @@ function normalizeState(raw) {
         ? e.members.filter(x => x && typeof x === 'object').map(x => ({
             id: x.id || uid(),
             name: typeof x.name === 'string' ? x.name : '',
+            kana: typeof x.kana === 'string' ? x.kana : '',
             attending: x.attending !== false,
             amount: Number(x.amount) || 0,
             paid: !!x.paid,
@@ -954,6 +1108,7 @@ function normalizeState(raw) {
     out.members = raw.members.filter(m => m && typeof m === 'object').map(m => ({
       id: m.id || uid(),
       name: typeof m.name === 'string' ? m.name : '',
+      kana: typeof m.kana === 'string' ? m.kana : '',
       role: typeof m.role === 'string' ? m.role : '',
     }));
   }
@@ -962,6 +1117,35 @@ function normalizeState(raw) {
     out.memberSort = raw.memberSort;
   }
   return out;
+}
+
+/** バックアップが未実施、または14日以上古い */
+function isBackupStale() {
+  if (!state.lastBackupAt) return true;
+  const d = new Date(String(state.lastBackupAt) + 'T00:00:00');
+  if (isNaN(d.getTime())) return true;
+  return (Date.now() - d.getTime()) / (1000 * 60 * 60 * 24) >= 14;
+}
+
+const BACKUP_BANNER_DISMISS_KEY = 'nomikai_backup_banner_dismissed';
+
+function updateBackupBanner() {
+  const banner = document.getElementById('backupBanner');
+  if (!banner) return;
+  const stale = isBackupStale();
+  const dismissed = sessionStorage.getItem(BACKUP_BANNER_DISMISS_KEY) === '1';
+  banner.classList.toggle('hidden', !(stale && !dismissed));
+  const msg = document.getElementById('backupBannerMsg');
+  if (msg) {
+    msg.textContent = !state.lastBackupAt
+      ? 'まだ一度もバックアップしていません。JSONファイルをダウンロードして保管してください。'
+      : `最終バックアップは ${dateLabel(state.lastBackupAt)} です。しばらく経っているので再バックアップを推奨します。`;
+  }
+}
+
+function dismissBackupBanner() {
+  sessionStorage.setItem(BACKUP_BANNER_DISMISS_KEY, '1');
+  updateBackupBanner();
 }
 
 function exportBackup() {
@@ -978,7 +1162,9 @@ function exportBackup() {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  renderSidebar(); // 最終バックアップ日表示を更新
+  sessionStorage.removeItem(BACKUP_BANNER_DISMISS_KEY);
+  renderSidebar();
+  updateBackupBanner();
 }
 
 function importBackup(file) {
@@ -1056,16 +1242,16 @@ function buildReportHTML(ev) {
 
     <table class="pr-summary"><tr>
       <td><span>前回繰越</span><b>${fmt(carryover)}</b></td>
-      <td><span>集金合計</span><b>${fmt(collected)}</b></td>
+      <td><span>集金予定</span><b>${fmt(collected)}</b></td>
       <td><span>支出合計</span><b>${fmt(spent)}</b></td>
-      <td><span>残高</span><b>${fmt(balance)}</b></td>
+      <td><span>予定残高</span><b>${fmt(balance)}</b></td>
     </tr></table>
 
     <div class="pr-note">
       参加 ${n}名 ／ 一人当たり予算 ${n > 0 ? fmt(perPerson) : '—'}
       ${settle ? '<br>' + settle : ''}
       ${unpaid.length ? `<br>未払い ${unpaid.length}名 ／ ${fmt(unpaidSum)}` : ''}
-      <br>次回への繰越金（実収）: <b>${fmt(cashBalance)}</b>
+      <br>次回への繰越（手元の現金・実収）: <b>${fmt(cashBalance)}</b>
     </div>
 
     <div class="pr-section">支出明細</div>
@@ -1235,19 +1421,23 @@ function renderMembersPage() {
     const handle = canDrag
       ? '<button class="drag-handle" data-drag-handle aria-label="ドラッグして並び替え" title="ドラッグして並び替え">⠿</button>'
       : '';
+    const kanaLine = (m.kana || '').trim()
+      ? `<div class="member-kana">${esc(m.kana)}</div>`
+      : '<div class="member-kana is-empty">よみがな未設定</div>';
     return `
     <div class="member-item${canDrag ? ' draggable' : ''}" data-rid="${m.id}">
       ${handle}
       <div class="member-avatar" style="background:linear-gradient(135deg,${role.color}cc,${role.color}88)">${esc(m.name.slice(0, 2))}</div>
       <div style="flex:1;min-width:0">
         <div class="member-name">${esc(m.name)}</div>
+        ${kanaLine}
         ${m.role ? `<div class="role-badge" style="color:${role.color};background:${role.bg}">${role.label}</div>` : ''}
       </div>
       <div class="member-controls">
         <select class="role-select" data-rid="${m.id}" title="役職を選択">
           ${roleOptionsHTML(m.role)}
         </select>
-        <button class="expense-btn edit-global-member" data-rid="${m.id}" title="名前を編集">✏️ 編集</button>
+        <button class="expense-btn edit-global-member" data-rid="${m.id}" title="編集">✏️ 編集</button>
         <button class="member-remove del-global-member" data-rid="${m.id}" title="削除">✕</button>
       </div>
     </div>`;
@@ -1295,13 +1485,16 @@ function renderMembersPage() {
 
 function addGlobalMember() {
   const input = document.getElementById('globalMemberName');
+  const kanaInput = document.getElementById('globalMemberKana');
   const name = input.value.trim();
+  const kana = (kanaInput && kanaInput.value.trim()) || '';
   if (!name) { input.focus(); return; }
   if (state.members.find(m => m.name === name)) {
     if (!confirm(`「${name}」は既に登録されています。別人として追加しますか？`)) return;
   }
-  state.members.push({ id: uid(), name });
+  state.members.push({ id: uid(), name, kana });
   input.value = '';
+  if (kanaInput) kanaInput.value = '';
   input.focus();
   saveState(); render();
 }
@@ -1311,6 +1504,8 @@ function openEditMemberModal(rid) {
   const m = state.members.find(m => m.id === rid);
   if (!m) return;
   document.getElementById('editMemberName').value = m.name;
+  const kanaEl = document.getElementById('editMemberKana');
+  if (kanaEl) kanaEl.value = m.kana || '';
   document.getElementById('modalEditMember').classList.remove('hidden');
   setTimeout(() => document.getElementById('editMemberName').select(), 80);
 }
@@ -1321,14 +1516,18 @@ function closeEditMemberModal() {
 function saveEditMember() {
   const newName = document.getElementById('editMemberName').value.trim();
   if (!newName) return;
+  const kanaEl = document.getElementById('editMemberKana');
+  const newKana = (kanaEl && kanaEl.value.trim()) || '';
   const m = state.members.find(m => m.id === editingMemberId);
   if (!m) return;
-  const oldName = m.name;
   m.name = newName;
-  // 全イベント内の同一メンバー名も更新
+  m.kana = newKana;
   state.events.forEach(ev => {
     (ev.members || []).forEach(em => {
-      if (em.registeredId === editingMemberId) em.name = newName;
+      if (em.registeredId === editingMemberId) {
+        em.name = newName;
+        em.kana = newKana;
+      }
     });
   });
   saveState(); closeEditMemberModal(); render();
@@ -1424,19 +1623,25 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('memberSortSelect').addEventListener('change', onSortChange);
   document.getElementById('globalSortSelect').addEventListener('change', onSortChange);
 
-  // イベント設定
-  document.getElementById('btnSaveEvent').addEventListener('click', saveEventSettings);
+  // イベント設定（自動保存）
+  ['eventName', 'eventDate', 'eventCarry', 'eventNote'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('input', scheduleEventSettingsSave);
+    el.addEventListener('change', scheduleEventSettingsSave);
+  });
   document.getElementById('btnToggleComplete').addEventListener('click', toggleComplete);
   document.getElementById('btnDeleteEvent').addEventListener('click', deleteEvent);
   document.getElementById('btnPrintReport').addEventListener('click', printReport);
-  // 標準の印刷（Cmd/Ctrl+P や共有→印刷）でも正しいレポートを出す
   window.addEventListener('beforeprint', preparePrintReport);
   window.addEventListener('afterprint', clearPrintReport);
 
-
-
   // バックアップ・復元
   document.getElementById('btnExport').addEventListener('click', exportBackup);
+  const btnBanner = document.getElementById('btnBackupBanner');
+  if (btnBanner) btnBanner.addEventListener('click', exportBackup);
+  const btnDismiss = document.getElementById('btnDismissBackupBanner');
+  if (btnDismiss) btnDismiss.addEventListener('click', dismissBackupBanner);
   document.getElementById('importFile').addEventListener('change', e => {
     if (e.target.files[0]) { importBackup(e.target.files[0]); e.target.value = ''; }
   });
