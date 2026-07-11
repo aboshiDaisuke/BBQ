@@ -141,6 +141,8 @@ function loadState() {
       }
       // 日付データのマイグレーション: 不正な形式(例:202604-01-21)を修正
       migrateDates();
+      // サンプルイベント名のリネーム（既存 localStorage 向け）
+      if (migrateSampleEventName()) saveState();
     } else {
       // 初回（保存データが無い）のときだけチュートリアル用サンプルを投入。
       // 一度でも保存されればキーが残るので、削除しても二度と復活しない。
@@ -149,6 +151,26 @@ function loadState() {
   } catch (e) {
     console.warn('Failed to load state', e);
   }
+}
+
+/** 旧サンプル名を現在の表記に揃える。変更があれば true */
+function migrateSampleEventName() {
+  const TARGET = '🍻 サンプル（使い方の例）';
+  const OLD_NAMES = [
+    '🍻 サンプル飲み会（使い方の例）',
+    '🍻 サンプ会（使い方の例）',
+    'サンプル飲み会（使い方の例）',
+    'サンプ会（使い方の例）',
+  ];
+  let changed = false;
+  (state.events || []).forEach(ev => {
+    if (!ev || typeof ev.name !== 'string') return;
+    if (OLD_NAMES.includes(ev.name) || /^🍻?\s*サンプル飲み会/.test(ev.name) || /^🍻?\s*サンプ会/.test(ev.name)) {
+      ev.name = TARGET;
+      changed = true;
+    }
+  });
+  return changed;
 }
 
 /** チュートリアル用のサンプルデータを投入（初回 / 空状態の「サンプルを見る」から呼ぶ） */
@@ -165,7 +187,7 @@ function loadTutorialSample() {
   });
   const ev = {
     id: uid(),
-    name: '🍻 サンプル飲み会（使い方の例）',
+    name: '🍻 サンプル（使い方の例）',
     date: todayISO(),
     note: 'これは使い方の見本です。不要なら右上の「削除」で消せます',
     carryover: 3000,
