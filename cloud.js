@@ -1,11 +1,11 @@
 'use strict';
 // =============================================================
-// クラウド同期（Supabase）
+// クラウド同期（Firebase）
 // -------------------------------------------------------------
 // ・あらかじめ作成した1アカウントでログインして使う想定。
 // ・データは localStorage に保存し続けつつ、ログイン中は
-//   Supabase の app_state テーブル（1ユーザー=1行・JSON丸ごと）
-//   にも自動でバックアップする。
+//   Firestore の app_state コレクション（1ユーザー=1ドキュメント・
+//   JSON丸ごと文字列で保存）にも自動でバックアップする。
 // ・未ログイン／未設定でも、アプリはこれまで通り使える。
 //
 // app.js とは同じグローバルスコープを共有しているため、
@@ -14,16 +14,17 @@
 // window.__cloudPush() が呼ばれる。
 // =============================================================
 (function () {
-  const cfg = window.SUPABASE_CONFIG || {};
-  const SYNCED_KEY = 'nomikai_cloud_synced_at'; // 最後にクラウドと一致した updated_at
+  const cfg = window.FIREBASE_CONFIG || {};
+  const SYNCED_KEY = 'nomikai_cloud_synced_at'; // 最後にクラウドと一致した updatedAt
   const PUSH_DELAY = 1200;                       // 保存→アップロードのまとめ待ち(ms)
   const LOGIN_DOMAIN = '@nomikai.local';         // ID にメール形式を付与（ユーザーには見せない）
-  const LOGIN_PAD = '#nomikai';                  // パスワードに固定文字を付与（Supabaseの最低6文字対策）
+  const LOGIN_PAD = '#nomikai';                  // パスワードに固定文字を付与（最低6文字対策）
 
-  const configured = !!(cfg.url && cfg.anonKey &&
-    !cfg.url.includes('YOUR-') && !cfg.anonKey.includes('YOUR-'));
+  const configured = !!(cfg.apiKey && cfg.projectId &&
+    !cfg.apiKey.includes('YOUR-') && !cfg.projectId.includes('YOUR-'));
 
-  let supa = null;
+  let auth = null;
+  let db = null;
   let currentUser = null;
   let pushTimer = null;
   let paused = false; // クラウド→端末の取り込み中は push を止める
@@ -55,32 +56,39 @@
     el.style.display = msg ? '' : 'none';
   }
 
-  // ---- Supabase 通信 -----------------------------------------
+  // ---- Firestore 通信 -----------------------------------------
   async function fetchCloud() {
-    if (!supa || !currentUser) return null;
-    const { data, error } = await supa
-      .from('app_state')
-      .select('data, updated_at')
-      .eq('user_id', currentUser.id)
-      .maybeSingle();
-    if (error) { console.warn('[cloud] fetch error', error); return null; }
-    return data; // {data, updated_at} | null
+    if (!db || !currentUser) return null;
+    try {
+      const snap = await db.collection('app_state').doc(currentUser.uid).get();
+      if (!snap.exists) return null;
+      const d = snap.data() || {};
+      let payload = null;
+      try { payload = d.json ? JSON.parse(d.json) : null; }
+      catch (e) { console.warn('[cloud] broken cloud json', e); }
+      return { data: payload, updated_at: d.updatedAt || null };
+    } catch (error) {
+      console.warn('[cloud] fetch error', error);
+      return null;
+    }
   }
 
   async function pushToCloud() {
-    if (!supa || !currentUser) return;
+    if (!db || !currentUser) return;
     setCloudInfo('同期中…');
     const payload = { state, currentEventId };
-    const { data, error } = await supa
-      .from('app_state')
-      .upsert(
-        { user_id: currentUser.id, data: payload, updated_at: new Date().toISOString() },
-        { onConflict: 'user_id' }
-      )
-      .select('updated_at')
-      .maybeSingle();
-    if (error) { console.warn('[cloud] push error', error); setCloudInfo('⚠️ 同期エラー', true); return; }
-    if (data && data.updated_at) localStorage.setItem(SYNCED_KEY, data.updated_at);
+    const updatedAt = new Date().toISOString();
+    try {
+      await db.collection('app_state').doc(currentUser.uid).set({
+        json: JSON.stringify(payload),
+        updatedAt,
+      });
+    } catch (error) {
+      console.warn('[cloud] push error', error);
+      setCloudInfo('⚠️ 同期エラー', true);
+      return;
+    }
+    localStorage.setItem(SYNCED_KEY, updatedAt);
     setCloudInfo('☁️ 同期済み ' + nowLabel());
   }
 
@@ -141,17 +149,20 @@
     setLoginError('');
     const btn = $('btnCloudLogin');
     if (btn) { btn.disabled = true; btn.textContent = 'ログイン中…'; }
-    const { data, error } = await supa.auth.signInWithPassword({ email, password: fullPassword });
-    if (btn) { btn.disabled = false; btn.textContent = 'ログイン'; }
-    if (error) { setLoginError('IDかパスワードが正しくありません。'); return; }
-    currentUser = data.user;
-    $('cloudPassword').value = '';
-    updateCloudUI();
-    await syncOnLogin();
+    try {
+      await auth.signInWithEmailAndPassword(email, fullPassword);
+      // 以降は onAuthStateChanged が currentUser の設定と同期を行う
+      $('cloudPassword').value = '';
+    } catch (error) {
+      console.warn('[cloud] login error', error);
+      setLoginError('IDかパスワードが正しくありません。');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'ログイン'; }
+    }
   }
 
   async function doLogout() {
-    if (supa) await supa.auth.signOut();
+    if (auth) await auth.signOut();
     currentUser = null;
     updateCloudUI();
     setCloudInfo('ログアウトしました（端末のデータは残っています）');
@@ -214,15 +225,17 @@
 
   // ---- saveState からのフック（自動アップロード） -------------
   window.__cloudPush = function () {
-    if (paused || !supa || !currentUser) return;
+    if (paused || !db || !currentUser) return;
     clearTimeout(pushTimer);
     pushTimer = setTimeout(pushToCloud, PUSH_DELAY);
   };
 
   // ---- 初期化 -------------------------------------------------
-  async function init() {
-    if (configured && window.supabase && window.supabase.createClient) {
-      supa = window.supabase.createClient(cfg.url, cfg.anonKey);
+  function init() {
+    if (configured && window.firebase && window.firebase.initializeApp) {
+      firebase.initializeApp(cfg);
+      auth = firebase.auth();
+      db = firebase.firestore();
     }
     // ボタン・モーダル配線
     const on = (id, ev, fn) => { const el = $(id); if (el) el.addEventListener(ev, fn); };
@@ -242,16 +255,19 @@
 
     updateCloudUI();
 
-    // 既存セッションがあれば自動でログイン状態にして同期
-    if (supa) {
-      try {
-        const { data } = await supa.auth.getSession();
-        if (data && data.session) {
-          currentUser = data.session.user;
+    // ログイン成功・前回セッションの復元をここで一括処理
+    // （手動ログインも自動復元も、この listener 経由で同期が走る）
+    if (auth) {
+      auth.onAuthStateChanged(async user => {
+        if (user && !currentUser) {
+          currentUser = user;
           updateCloudUI();
           await syncOnLogin();
+        } else if (!user) {
+          currentUser = null;
+          updateCloudUI();
         }
-      } catch (err) { console.warn('[cloud] session check failed', err); }
+      });
     }
   }
 

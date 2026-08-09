@@ -485,7 +485,7 @@
     <div class="modal-body">
       <!-- 未設定のとき -->
       <div id="cloudNotConfigured" style="display:none">
-        <p class="cloud-note">クラウド同期はまだ設定されていません。<code>supabase-config.js</code> に接続情報（URL と anon key）を設定すると使えるようになります。設定がなくても、アプリはこれまで通り端末内で動きます。</p>
+        <p class="cloud-note">クラウド同期はまだ設定されていません。<code>firebase-config.js</code> に接続情報を設定すると使えるようになります。設定がなくても、アプリはこれまで通り端末内で動きます。</p>
       </div>
       <!-- ログアウト中 -->
       <div id="cloudLoggedOut" style="display:none">
@@ -524,8 +524,10 @@
 <!-- ===== 印刷用レポート（画面では非表示、印刷/PDF時のみ表示） ===== -->
 <div id="printReport" class="print-report"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
 <script src="app.js"></script>
 <script src="cloud.js"></script>
 </body>
