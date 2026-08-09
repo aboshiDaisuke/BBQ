@@ -518,7 +518,7 @@ function renderDetail() {
   const lockBanner = document.getElementById('completedLockBanner');
   if (lockBanner) lockBanner.classList.toggle('hidden', !completed);
   const tgl = document.getElementById('btnToggleComplete');
-  tgl.textContent = completed ? '🔓 再オープン' : '✅ 精算完了にする';
+  tgl.textContent = completed ? '🔓 再オープン' : '🎀 精算完了にする';
   tgl.classList.toggle('is-complete', completed);
 
   // フォーム
@@ -1326,10 +1326,10 @@ function renderDashboard() {
 
   // 統計カード
   const stats = [
-    { icon: '📅', label: 'イベント数', value: `${evs.length}件`, cls: '' },
-    { icon: '💸', label: '総支出', value: fmt(totalSpent), cls: 'red' },
-    { icon: '💰', label: '実収合計', value: fmt(totalPaid), cls: 'green' },
-    { icon: '⏳', label: '未回収合計', value: fmt(totalUnpaid), cls: totalUnpaid > 0 ? 'red' : '' },
+    { icon: '🎉', label: 'イベント数', value: `${evs.length}件`, cls: '' },
+    { icon: '🛍️', label: '総支出', value: fmt(totalSpent), cls: 'red' },
+    { icon: '🪙', label: '実収合計', value: fmt(totalPaid), cls: 'green' },
+    { icon: '⏰', label: '未回収合計', value: fmt(totalUnpaid), cls: totalUnpaid > 0 ? 'red' : '' },
   ];
   document.getElementById('dashStats').innerHTML = stats.map(s => `
     <div class="summary-card">
@@ -1556,6 +1556,10 @@ function initSplash() {
     if (dismissed) return;
     dismissed = true;
     splash.classList.add('is-hiding');
+    // Three.js 背景を控えめモードへ
+    if (window.CuteThree && typeof window.CuteThree.goAmbient === 'function') {
+      window.CuteThree.goAmbient();
+    }
     // フェード後にDOMから除去（印刷やフォーカスの邪魔をしない）
     setTimeout(() => splash.remove(), 600);
   };

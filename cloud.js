@@ -89,7 +89,7 @@
       return;
     }
     localStorage.setItem(SYNCED_KEY, updatedAt);
-    setCloudInfo('☁️ 同期済み ' + nowLabel());
+    setCloudInfo('🌥️ 同期済み ' + nowLabel());
   }
 
   // クラウドの内容を端末（state/localStorage）へ取り込む
@@ -104,7 +104,7 @@
     if (row && row.updated_at) localStorage.setItem(SYNCED_KEY, row.updated_at);
     paused = false;
     if (typeof render === 'function') render();
-    setCloudInfo('☁️ クラウドから読み込みました ' + nowLabel());
+    setCloudInfo('🌥️ クラウドから読み込みました ' + nowLabel());
   }
 
   // ---- ログイン直後の同期（吸い上げ／取り込みの判定） --------
@@ -131,9 +131,9 @@
     } else if (!cloudHas && localHas) {
       // 初回：この端末のデータをクラウドへ吸い上げ
       await pushToCloud();
-      setCloudInfo('☁️ この端末のデータをクラウドに保存しました');
+      setCloudInfo('🌥️ この端末のデータをクラウドに保存しました');
     } else {
-      setCloudInfo('☁️ ログイン中（データはまだありません）');
+      setCloudInfo('🌥️ ログイン中（データはまだありません）');
     }
     updateCloudUI();
   }
@@ -193,7 +193,7 @@
     if (!configured) {
       show(notConf, true); show(out, false); show(inn, false);
       show(btnLogin, false); show(btnLogout, false);
-      if (btnCloud) btnCloud.textContent = '☁️ クラウド同期（未設定）';
+      if (btnCloud) btnCloud.textContent = '🌥️ クラウド同期（未設定）';
       setCloudInfo('クラウド未設定');
       return;
     }
@@ -202,11 +202,11 @@
       show(btnLogin, false); show(btnLogout, true);
       const em = $('cloudUserEmail');
       if (em) em.textContent = (currentUser.email || '').replace(LOGIN_DOMAIN, '');
-      if (btnCloud) btnCloud.textContent = '☁️ クラウド同期（ログイン中）';
+      if (btnCloud) btnCloud.textContent = '🌥️ クラウド同期（ログイン中）';
     } else {
       show(notConf, false); show(out, true); show(inn, false);
       show(btnLogin, true); show(btnLogout, false);
-      if (btnCloud) btnCloud.textContent = '☁️ クラウド同期（ログイン）';
+      if (btnCloud) btnCloud.textContent = '🌥️ クラウド同期（ログイン）';
     }
   }
 
