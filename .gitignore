@@ -1,7 +1,8 @@
 # 元データ（デザイン配布zip・キャラの元画像）はリポジトリに含めない
-# 加工済みの assets/mascot.png のみ管理する
+# 画面で使う加工済みアセットのみ管理する
 bbq.zip
 ChatGPT Image*.png
+.DS_Store
 
 # Supabase CLI のローカル一時ファイル（接続情報など）
 supabase/
