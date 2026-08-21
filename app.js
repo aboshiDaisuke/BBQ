@@ -1556,10 +1556,6 @@ function initSplash() {
     if (dismissed) return;
     dismissed = true;
     splash.classList.add('is-hiding');
-    // Three.js 背景を控えめモードへ
-    if (window.CuteThree && typeof window.CuteThree.goAmbient === 'function') {
-      window.CuteThree.goAmbient();
-    }
     // フェード後にDOMから除去（印刷やフォーカスの邪魔をしない）
     setTimeout(() => splash.remove(), 600);
   };

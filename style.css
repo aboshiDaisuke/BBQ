@@ -1,5 +1,5 @@
 /* ===================================================
-   KAWAII PASTEL DESIGN  ♡ 🍖🍻  + Three.js 背景
+   KAWAII PASTEL DESIGN  ♡ 🍖🍻
    飲み会・BBQ 予算管理 — パステル / ふわふわ / かわいい
    （クラス名・ID構造は元のまま。app.js はそのまま動きます）
    =================================================== */
@@ -53,21 +53,6 @@
 
 *,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { height: 100%; }
-
-/* Three.js 背景キャンバス */
-.bg-three {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 0;
-  pointer-events: none;
-  display: block;
-  transition: opacity 0.7s ease;
-}
-.bg-three.is-splash { opacity: 0; }
-/* 本編はごく薄く。UI の邪魔をしない */
-.bg-three.is-ambient { opacity: 0.18; }
 
 body {
   font-family: var(--font);
@@ -1343,7 +1328,6 @@ body.dragging-active { user-select: none; -webkit-user-select: none; cursor: gra
   body.printing > .layout,
   body.printing > .sidebar-overlay,
   body.printing > #splashScreen,
-  body.printing > #bgThree,
   body.printing > .modal-overlay { display: none !important; }
 
   body.printing .print-report {
@@ -1406,7 +1390,7 @@ body.dragging-active { user-select: none; -webkit-user-select: none; cursor: gra
 
 /* ===================================================
    SPLASH SCREEN  —  かわいい起動スプラッシュ ♡
-   Three.js 背景の上にマスコット＋ガラスカード
+   マスコット＋ガラスカード
    =================================================== */
 .splash {
   position: fixed;
@@ -1615,5 +1599,4 @@ body.dragging-active { user-select: none; -webkit-user-select: none; cursor: gra
   .empty-icon,
   .empty-float { animation: none !important; }
   .splash-sparkle { opacity: .55; }
-  .bg-three { opacity: 0.35 !important; }
 }
