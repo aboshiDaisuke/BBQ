@@ -11,6 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800;900&family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="party.css">
 </head>
 <body>
 
@@ -27,12 +28,12 @@
     <div class="splash-mascot-wrap">
       <div class="splash-glow"></div>
       <div class="splash-ring" aria-hidden="true"></div>
-      <img class="splash-mascot" src="assets/mascot.webp?v=9" alt="飲み会マスコット" width="152" height="270" decoding="async">
+      <img class="splash-mascot" src="assets/mascot.webp?v=9" alt="乾杯するぐろちゃん" width="152" height="270" decoding="async">
     </div>
-    <div class="splash-badge">かわいく予算管理 ♡</div>
+    <div class="splash-badge">ぐろちゃんの PARTY CLUB ✦</div>
     <div class="splash-title">飲み会管理</div>
-    <div class="splash-tagline">かんぱーい！🍻 予算と集金、まるっとおまかせ</div>
-    <button class="splash-start" id="splashStart" type="button">タップして始める ♡</button>
+    <div class="splash-tagline">楽しい時間も、お金の管理も。<br>ぐろちゃんと、かわいくしっかり ♡</div>
+    <button class="splash-start" id="splashStart" type="button">はじめる ♡ →</button>
   </div>
 </div>
 
@@ -42,10 +43,10 @@
     <div class="app-icon" aria-hidden="true">
       <img src="assets/app-icon.webp?v=9" alt="" width="44" height="44" decoding="async">
     </div>
-    <div class="app-title">飲み会管理</div>
+    <div><div class="brand-eyebrow">ぐろちゃんと</div><div class="app-title">飲み会管理<span class="brand-heart">♥</span></div></div>
   </div>
 
-  <div class="sidebar-section-label">イベント</div>
+  <div class="sidebar-section-label">MY EVENTS <span>イベント</span></div>
   <div id="eventList" class="event-list"></div>
 
   <button class="new-event-btn" id="btnNewEvent">
@@ -55,7 +56,7 @@
 
   <div class="sidebar-divider"></div>
 
-  <div class="sidebar-section-label">設定</div>
+  <div class="sidebar-section-label">MENU <span>管理メニュー</span></div>
   <button class="sidebar-nav-btn" id="btnNavDashboard">
     <span class="sidebar-nav-icon" aria-hidden="true">📈</span>
     ダッシュボード
@@ -66,6 +67,10 @@
     <span class="sidebar-nav-badge" id="memberCountBadge"></span>
   </button>
 
+  <div class="sidebar-cheer" aria-hidden="true">
+    <img src="assets/mascot.webp?v=9" alt="" width="62" height="110">
+    <div><span>幹事さん、おつかれ♡</span><small>今日も楽しくいこっ！</small></div>
+  </div>
   <div class="sidebar-footer">
     <button class="sidebar-action" id="btnCloud">🌥️ クラウド同期</button>
     <div class="sidebar-backup-info" id="cloudInfo"></div>
@@ -80,9 +85,9 @@
 <div class="layout">
   <!-- モバイルヘッダー -->
   <header class="mobile-header">
-    <button class="menu-btn" id="btnMenu">☰</button>
+    <button class="menu-btn" id="btnMenu" aria-label="イベントと管理メニューを開く">☰</button>
     <span class="mobile-title">飲み会管理</span>
-    <div style="width:36px"></div>
+    <img class="mobile-avatar" src="assets/app-icon.webp?v=9" alt="ぐろちゃん" width="36" height="36">
   </header>
 
   <!-- バックアップ促し -->
@@ -98,38 +103,50 @@
   </div>
 
   <main class="content" id="content">
+    <div class="page-eyebrow"><span>✦ PARTY MONEY NOTE</span><span>かわいく、しっかり。<span aria-hidden="true"> ♡</span></span></div>
     <!-- 空状態 -->
     <div id="emptyState" class="empty-state">
       <div class="empty-icon-stage" aria-hidden="true">
         <div class="empty-icon empty-icon--img">
-          <img src="assets/app-icon.webp?v=9" alt="" width="72" height="72" decoding="async">
+          <img src="assets/mascot.webp?v=9" alt="" width="152" height="270" decoding="async">
         </div>
         <span class="empty-float f1">♡</span>
         <span class="empty-float f2">✨</span>
         <span class="empty-float f3">⭐</span>
       </div>
-      <h1 class="empty-title">飲み会管理</h1>
-      <p class="empty-desc">イベントを作って、集金も支出もふわっと管理しよ♡</p>
+      <span class="mini-label">LET’S PARTY ♡</span>
+      <h1 class="empty-title">次の楽しい予定、つくろっ。</h1>
+      <p class="empty-desc">飲み会もBBQも、これひとつ。<br>みんなのお金を、わかりやすく管理しよ♡</p>
       <button class="btn-primary" id="btnNewEventEmpty">＋ 新しいイベントを作成</button>
       <button class="btn-ghost" id="btnLoadSample">👀 サンプルを見る（使い方の例）</button>
+      <ol class="welcome-steps"><li><b>01</b><span>イベントを作る</span></li><li><b>02</b><span>支出を記録する</span></li><li><b>03</b><span>集金をチェック</span></li></ol>
     </div>
 
     <!-- イベント詳細 -->
     <div id="eventDetail" class="hidden">
 
+      <section class="party-hero" aria-label="ぐろちゃんからのメッセージ">
+        <div class="party-hero-copy"><span class="mini-label">GOOD TIMES, GOOD VIBES</span><h2>楽しく集まって、<br>お金もすっきり<span>♡</span></h2><p>支出を記録 → 集金をチェック。<br class="mobile-only">あとは、みんなでかんぱい！</p></div>
+        <div class="party-hero-art" aria-hidden="true"><span class="hero-orbit"></span><span class="hero-sticker">幹事、まかせて♡</span><span class="hero-star">✦</span><img src="assets/mascot.webp?v=9" alt="" width="152" height="270"><span class="hero-heart">♡</span></div>
+      </section>
+
       <!-- タイトルバー -->
       <div class="detail-titlebar">
         <div>
+          <div class="section-eyebrow">YOUR EVENT</div>
           <h1 class="detail-title" id="detailTitle">イベント名</h1>
           <span class="detail-complete-flag" id="completeFlag" hidden>✓ 精算完了</span>
           <div class="detail-subtitle" id="detailSubtitle">日付</div>
         </div>
         <div class="detail-actions">
+          <button class="btn-soft-sm" id="btnCopyEvent">♡ コピーして次回を作る</button>
           <button class="btn-soft-sm" id="btnToggleComplete">🎀 精算完了にする</button>
           <button class="btn-soft-sm" id="btnPrintReport">📝 PDFで保存</button>
           <button class="btn-destructive-sm" id="btnDeleteEvent">削除</button>
         </div>
       </div>
+
+      <nav class="event-shortcuts" aria-label="イベント内の移動"><a href="#summarySection">♡ 予算を確認</a><a href="#expensesCard">＋ 支出を記録</a><a href="#membersCard">✓ 集金をチェック</a><a href="#eventSettingsCard">⚙ イベント設定</a></nav>
 
       <!-- 精算完了ロック表示 -->
       <div id="completedLockBanner" class="completed-lock-banner hidden" role="status">
@@ -137,7 +154,7 @@
       </div>
 
       <!-- サマリーカード -->
-      <div class="summary-grid">
+      <div class="summary-grid" id="summarySection">
         <div class="summary-card" id="cardCarry">
           <div class="summary-icon">🎁</div>
           <div class="summary-amount" id="sumCarry">¥0</div>
@@ -188,6 +205,50 @@
         <div class="carry-forward-amount" id="carryForwardAmount">¥0</div>
       </div>
 
+      <!-- 支出 -->
+      <div class="card" id="expensesCard">
+        <div class="card-header">
+          <div><div class="card-title"><span class="section-number">01</span> 支出</div><p class="section-help">お店代や買い出しなど、使ったお金</p></div>
+          <button class="btn-icon-circle labeled-add" id="btnAddExpense" title="支出を追加">＋ 支出を追加</button>
+        </div>
+        <div id="expenseList"></div>
+      </div>
+
+      <!-- 参加者・集金 -->
+      <div class="card" id="membersCard">
+        <div class="card-header">
+          <div><div class="card-title"><span class="section-number">02</span> 参加者・集金</div><p class="section-help">受け取ったら「未払い」をタップして支払済に</p></div>
+          <div class="card-header-actions">
+            <button class="btn-soft-sm" id="btnSplitEqually" title="支出を参加者で均等割りして集金額に設定">🍰 割り勘</button>
+            <button class="btn-icon-circle labeled-add" id="btnAddMember" title="メンバーを追加">＋ 参加者を追加</button>
+          </div>
+        </div>
+        <div class="collection-progress" id="collectionProgress">
+          <div class="collection-progress-copy">
+            <div class="collection-progress-heading"><strong id="collectionProgressText">集金額を設定すると進捗が表示されます</strong><span id="collectionProgressPercent">—</span></div>
+            <div class="collection-progress-track" id="collectionProgressBar" role="progressbar" aria-label="集金済みの人数" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="collectionProgressFill"></span></div>
+            <p id="collectionProgressHint">参加者ごとの集金額を入力してください。</p>
+          </div>
+          <div class="collection-celebration hidden" id="collectionCelebration" role="status"><img src="assets/mascot.webp?v=9" alt="お祝いするぐろちゃん" width="48" height="85"><span>全員集金できたね！<br>幹事さん、おつかれ♡</span></div>
+        </div>
+        <div class="member-toolbar" id="memberToolbar" style="display:none">
+          <span class="member-toolbar-info" id="unpaidSummary"></span>
+          <div class="member-toolbar-right">
+            <label class="member-sort">並び替え
+              <select id="memberSortSelect">
+                <option value="role">役職順</option>
+                <option value="kana">五十音順</option>
+                <option value="manual">手動（ドラッグ）</option>
+              </select>
+            </label>
+            <label class="member-toolbar-toggle">
+              <input type="checkbox" id="filterUnpaid"> 未払いのみ表示
+            </label>
+          </div>
+        </div>
+        <div id="memberList"></div>
+      </div>
+
       <!-- イベント設定（自動保存） -->
       <div class="card" id="eventSettingsCard">
         <div class="card-header">
@@ -212,42 +273,6 @@
             <input type="text" id="eventNote" class="field-input" placeholder="備考など" autocomplete="off">
           </div>
         </div>
-      </div>
-
-      <!-- 支出 -->
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">支出</div>
-          <button class="btn-icon-circle" id="btnAddExpense" title="支出を追加">+</button>
-        </div>
-        <div id="expenseList"></div>
-      </div>
-
-      <!-- 参加者・集金 -->
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">参加者・集金</div>
-          <div class="card-header-actions">
-            <button class="btn-soft-sm" id="btnSplitEqually" title="支出を参加者で均等割りして集金額に設定">🍰 割り勘</button>
-            <button class="btn-icon-circle" id="btnAddMember" title="メンバーを追加">+</button>
-          </div>
-        </div>
-        <div class="member-toolbar" id="memberToolbar" style="display:none">
-          <span class="member-toolbar-info" id="unpaidSummary"></span>
-          <div class="member-toolbar-right">
-            <label class="member-sort">並び替え
-              <select id="memberSortSelect">
-                <option value="role">役職順</option>
-                <option value="kana">五十音順</option>
-                <option value="manual">手動（ドラッグ）</option>
-              </select>
-            </label>
-            <label class="member-toolbar-toggle">
-              <input type="checkbox" id="filterUnpaid"> 未払いのみ表示
-            </label>
-          </div>
-        </div>
-        <div id="memberList"></div>
       </div>
 
     </div>
@@ -321,9 +346,10 @@
 <div id="modalNewEvent" class="modal-overlay hidden">
   <div class="modal">
     <div class="modal-header">
-      <h2 class="modal-title">新しいイベント</h2>
+      <h2 class="modal-title" id="newEventModalTitle">新しいイベント</h2>
     </div>
     <div class="modal-body">
+      <p class="copy-event-note hidden" id="copyEventNote">参加者・役職・集金額をコピーします。出欠は「参加」、支払いは「未払い」からスタート。支出は引き継ぎません。</p>
       <div class="field">
         <label class="field-label">イベント名 <span class="required">必須</span></label>
         <input type="text" id="newEventName" class="field-input" placeholder="例: 6月飲み会" autofocus>
@@ -343,7 +369,7 @@
         </label>
         <div class="field-hint" id="carryFromPrevHint"></div>
       </div>
-      <div class="field">
+      <div class="field" id="newEventAutoAddField">
         <label class="field-label" style="display:flex;align-items:center;gap:8px">
           <input type="checkbox" id="newEventAutoAdd" class="checkbox" checked>
           登録済みメンバーを自動追加
@@ -491,6 +517,12 @@
 
 <!-- サイドバーオーバーレイ（モバイル） -->
 <div class="sidebar-overlay hidden" id="sidebarOverlay"></div>
+
+<div class="undo-toast hidden" id="undoToast" aria-label="削除の取り消し">
+  <div><p id="undoMessage" role="status"></p><small>次の削除・再読み込みまで取り消せます</small></div>
+  <button type="button" id="btnUndoDelete">取り消す</button>
+  <button type="button" class="undo-dismiss" id="btnDismissUndo" aria-label="取り消しの案内を閉じる">×</button>
+</div>
 
 <!-- ===== 印刷用レポート（画面では非表示、印刷/PDF時のみ表示） ===== -->
 <div id="printReport" class="print-report"></div>

@@ -134,6 +134,8 @@ let editingExpenseId = null;
 let currentPage = 'events'; // 'events' | 'members' | 'dashboard'
 let editingMemberId = null;
 let showUnpaidOnly = false;  // 参加者リストを未払いのみに絞り込むか
+let copyEventSourceId = null;
+let pendingDeletion = null;
 
 // =============================================================
 // STORAGE
@@ -150,7 +152,7 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      state = parsed.state || { events: [], members: [] };
+      state = normalizeState(parsed.state || { events: [], members: [] });
       currentEventId = parsed.currentEventId || null;
       if (currentEventId && !state.events.find(e => e.id === currentEventId)) {
         currentEventId = state.events.length ? state.events[state.events.length - 1].id : null;
@@ -263,7 +265,7 @@ function onEnterSubmit(el, handler) {
   });
 }
 function esc(str) {
-  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 function dateLabel(dateStr) {
   if (!dateStr) return '日付未設定';
@@ -321,6 +323,7 @@ function calcPerPerson(ev) {
 
 /** 集金予定カードの実収/未収サブ表示を更新 */
 function renderCollectedSub(ev) {
+  renderCollectionProgress(ev);
   const el = document.getElementById('sumCollectedSub');
   if (!el) return;
   const { collected, unpaidAmount, paidCollected } = calcSummary(ev);
@@ -331,6 +334,70 @@ function renderCollectedSub(ev) {
   } else {
     el.textContent = '未払い含む全員分の予定額';
   }
+}
+
+/** 集金額がある人を対象に、人数ベースで進捗を表示する。 */
+function collectionProgress(ev) {
+  const collectors = (ev.members || []).filter(m => Number(m.amount) > 0);
+  const paid = collectors.filter(m => m.paid).length;
+  const remaining = collectors.filter(m => !m.paid).reduce((sum, m) => sum + Number(m.amount), 0);
+  return { total: collectors.length, paid, remaining,
+    percent: collectors.length ? Math.round(paid / collectors.length * 100) : 0,
+    complete: collectors.length > 0 && paid === collectors.length };
+}
+
+function renderCollectionProgress(ev) {
+  const p = collectionProgress(ev);
+  document.getElementById('collectionProgressText').textContent = p.total
+    ? `${p.total}人中 ${p.paid}人から集金済み` : '集金額を設定すると進捗が表示されます';
+  document.getElementById('collectionProgressPercent').textContent = p.total ? `${p.percent}%` : '—';
+  document.getElementById('collectionProgressFill').style.width = `${p.percent}%`;
+  const bar = document.getElementById('collectionProgressBar');
+  bar.setAttribute('aria-valuenow', p.percent);
+  bar.setAttribute('aria-valuetext', p.total ? `${p.total}人中${p.paid}人から集金済み` : '集金額が未設定です');
+  document.getElementById('collectionProgressHint').textContent = p.total
+    ? (p.complete ? '全額集金済み ♡' : `あと ${fmt(p.remaining)} ／ 未払い ${p.total - p.paid}人`)
+    : '参加者ごとの集金額を入力してください。';
+  document.getElementById('collectionProgress').classList.toggle('is-complete', p.complete);
+  document.getElementById('collectionCelebration').classList.toggle('hidden', !p.complete);
+}
+
+// 削除した1件だけを保持し、その後の入力や編集を巻き戻さない。
+function deleteWithUndo({ getList, item, label, canRestore = () => true, onRestore = () => {} }) {
+  const list = getList();
+  const index = list.indexOf(item);
+  if (index < 0) return;
+  const snapshot = JSON.parse(JSON.stringify(item));
+  list.splice(index, 1);
+  pendingDeletion = { owner: state, getList, snapshot, index, label, canRestore, onRestore };
+}
+
+function dismissUndo() {
+  pendingDeletion = null;
+  renderUndo();
+}
+
+function renderUndo() {
+  if (pendingDeletion && pendingDeletion.owner !== state) pendingDeletion = null;
+  const toast = document.getElementById('undoToast');
+  toast.classList.toggle('hidden', !pendingDeletion);
+  if (pendingDeletion) document.getElementById('undoMessage').textContent = `${pendingDeletion.label}を削除しました`;
+}
+
+function undoDelete() {
+  const entry = pendingDeletion;
+  if (!entry || entry.owner !== state) { dismissUndo(); return; }
+  if (!entry.canRestore()) {
+    document.getElementById('undoMessage').textContent = '元のイベントを再オープンしてから取り消してください。';
+    return;
+  }
+  const list = entry.getList();
+  if (list.some(item => item.id === entry.snapshot.id)) { dismissUndo(); return; }
+  list.splice(Math.min(entry.index, list.length), 0, entry.snapshot);
+  entry.onRestore(entry.snapshot);
+  pendingDeletion = null;
+  saveState();
+  render();
 }
 
 /** 一人当たり予算の表示を更新 */
@@ -385,7 +452,7 @@ function refreshDetailSummary(ev) {
       : (collectors.length ? '全員支払い済み 🎉' : '集金額が未設定です');
   }
 
-  const sideItem = document.querySelector(`.event-item[data-id="${ev.id}"] .event-item-balance`);
+  const sideItem = document.querySelector(`.event-item[data-id="${CSS.escape(ev.id)}"] .event-item-balance`);
   if (sideItem) {
     sideItem.textContent = fmt(balance);
     sideItem.style.color = balance < 0 ? 'var(--red)' : 'var(--green)';
@@ -396,6 +463,7 @@ function refreshDetailSummary(ev) {
 // RENDER
 // =============================================================
 function render() {
+  renderUndo();
   renderSidebar();
   if (currentPage === 'members') {
     renderMembersPage();
@@ -419,10 +487,10 @@ function renderSidebar() {
       const done = ev.completed ? ' completed' : '';
       const check = ev.completed ? '<span class="event-item-check">✓</span>' : '';
       return `
-        <div class="event-item ${active}${done}" data-id="${ev.id}" role="button" tabindex="0">
+        <div class="event-item ${active}${done}" data-id="${esc(ev.id)}" role="button" tabindex="0">
           <div class="event-item-name">${check}${esc(ev.name)}</div>
           <div class="event-item-meta">
-            <span>${ev.date ? dateLabel(ev.date) : '日付未設定'}</span>
+            <span>${ev.date ? esc(dateLabel(ev.date)) : '日付未設定'}</span>
             <span class="event-item-balance" style="color:${balance < 0 ? 'var(--red)' : 'var(--green)'}">${fmt(balance)}</span>
           </div>
         </div>`;
@@ -563,8 +631,8 @@ function renderExpenses(ev) {
       <div class="expense-right">
         <span class="expense-amount">${fmt(exp.amount)}</span>
         ${locked ? '' : `
-        <button class="expense-btn edit-exp" data-eid="${exp.id}" title="編集">✏️</button>
-        <button class="expense-btn del-exp" data-eid="${exp.id}" title="削除">🗑</button>`}
+        <button class="expense-btn edit-exp" data-eid="${esc(exp.id)}" title="編集">✏️</button>
+        <button class="expense-btn del-exp" data-eid="${esc(exp.id)}" title="削除">🗑</button>`}
       </div>
     </div>`).join('');
 
@@ -585,7 +653,9 @@ function renderExpenses(ev) {
         '支出を削除しますか？',
         exp ? `「${exp.desc}」${fmt(exp.amount)} を削除します。` : 'この支出を削除します。',
         () => {
-          ev2.expenses = ev2.expenses.filter(e => e.id !== btn.dataset.eid);
+          if (isEventLocked(ev2) || !state.events.includes(ev2)) return;
+          deleteWithUndo({ getList: () => ev2.expenses, item: exp, label: '支出',
+            canRestore: () => state.events.includes(ev2) && !isEventLocked(ev2) });
           saveState(); render();
         }
       );
@@ -642,7 +712,7 @@ function renderMembers(ev) {
       ? '<button class="drag-handle" data-drag-handle aria-label="ドラッグして並び替え" title="ドラッグして並び替え">⠿</button>'
       : '';
     return `
-      <div class="member-item${canDrag ? ' draggable' : ''}${attending ? '' : ' not-attending'}" data-mid="${m.id}">
+      <div class="member-item${canDrag ? ' draggable' : ''}${attending ? '' : ' not-attending'}" data-mid="${esc(m.id)}">
         ${handle}
         <div class="member-avatar" style="background:linear-gradient(135deg,${role.color}cc,${role.color}88)">${esc(initials)}</div>
         <div style="min-width:0">
@@ -651,23 +721,23 @@ function renderMembers(ev) {
         </div>
         <div class="member-controls">
           <div class="attend-toggle">
-            <button class="attend-btn yes ${attending ? 'active' : ''}" data-mid="${m.id}" data-v="true"
+            <button class="attend-btn yes ${attending ? 'active' : ''}" data-mid="${esc(m.id)}" data-v="true"
               ${locked ? 'disabled' : ''}>参加</button>
-            <button class="attend-btn no ${!attending ? 'active' : ''}" data-mid="${m.id}" data-v="false"
+            <button class="attend-btn no ${!attending ? 'active' : ''}" data-mid="${esc(m.id)}" data-v="false"
               ${locked ? 'disabled' : ''}>不参加</button>
           </div>
           <div class="amount-field">
             <span class="amount-prefix">¥</span>
             <input class="amount-input" type="number" min="0" placeholder="0"
-              value="${m.amount || ''}" data-mid="${m.id}" aria-label="集金額"
+              value="${esc(m.amount || '')}" data-mid="${esc(m.id)}" aria-label="集金額"
               ${locked ? 'disabled' : ''}>
           </div>
-          <button class="paid-badge ${paid ? 'paid' : 'unpaid'}" data-mid="${m.id}" data-toggle-paid
+          <button class="paid-badge ${paid ? 'paid' : 'unpaid'}" data-mid="${esc(m.id)}" data-toggle-paid
             title="クリックで支払状況を切替" ${locked ? 'disabled' : ''}>
-            ${paid ? '✓ 済' : '未払'}
+            ${paid ? '✓ 支払済' : '未払い'}
           </button>
         </div>
-        ${locked ? '' : `<button class="member-remove" data-mid="${m.id}" title="削除">✕</button>`}
+        ${locked ? '' : `<button class="member-remove" data-mid="${esc(m.id)}" title="削除">✕</button>`}
       </div>`;
   }).join('');
 
@@ -717,7 +787,9 @@ function renderMembers(ev) {
         '参加者を削除しますか？',
         mem ? `「${mem.name}」を参加者リストから削除します。集金額・支払状況も失われます。` : 'この参加者を削除します。',
         () => {
-          ev2.members = ev2.members.filter(m => m.id !== btn.dataset.mid);
+          if (isEventLocked(ev2) || !state.events.includes(ev2)) return;
+          deleteWithUndo({ getList: () => ev2.members, item: mem, label: '参加者',
+            canRestore: () => state.events.includes(ev2) && !isEventLocked(ev2) });
           saveState(); render();
         }
       );
@@ -767,6 +839,10 @@ function splitEqually() {
 // NEW EVENT MODAL
 // =============================================================
 function openNewEventModal() {
+  copyEventSourceId = null;
+  document.getElementById('newEventModalTitle').textContent = '新しいイベント';
+  document.getElementById('copyEventNote').classList.add('hidden');
+  document.getElementById('newEventAutoAddField').classList.remove('hidden');
   document.getElementById('newEventName').value = '';
   document.getElementById('newEventDate').value = todayISO();
   document.getElementById('newEventCarry').value = '';
@@ -810,12 +886,44 @@ function openNewEventModal() {
   setTimeout(() => document.getElementById('newEventName').focus(), 100);
 }
 
+function copiedMembers(source) {
+  return (source.members || []).map(m => ({ ...m, id: uid(), attending: true, paid: false }));
+}
+
+function openCopyEventModal() {
+  const source = currentEvent();
+  if (!source) return;
+  openNewEventModal();
+  copyEventSourceId = source.id;
+  document.getElementById('newEventModalTitle').textContent = 'コピーして次回を作る';
+  document.getElementById('copyEventNote').classList.remove('hidden');
+  document.getElementById('newEventAutoAddField').classList.add('hidden');
+  document.getElementById('newEventName').value = `${source.name}（コピー）`;
+  const carryCheck = document.getElementById('carryFromPrev');
+  const cashBalance = calcSummary(source).cashBalance;
+  document.getElementById('carryFromPrevHint').textContent = `コピー元「${source.name}」の手元残高: ${fmt(cashBalance)}`;
+  carryCheck.checked = false;
+  const syncCarry = () => {
+    document.getElementById('newEventCarry').value = carryCheck.checked ? cashBalance : 0;
+    document.getElementById('newEventCarry').disabled = carryCheck.checked;
+  };
+  carryCheck.onchange = syncCarry;
+  syncCarry();
+}
+
 function closeNewEventModal() {
+  copyEventSourceId = null;
   document.getElementById('modalNewEvent').classList.add('hidden');
   document.getElementById('newEventCarry').disabled = false;
 }
 
 function createEvent() {
+  const source = copyEventSourceId ? state.events.find(ev => ev.id === copyEventSourceId) : null;
+  if (copyEventSourceId && !source) {
+    alert('コピー元のイベントが見つかりません。もう一度選択してください。');
+    closeNewEventModal();
+    return;
+  }
   const name = document.getElementById('newEventName').value.trim();
   if (!name) {
     document.getElementById('newEventName').focus();
@@ -825,7 +933,7 @@ function createEvent() {
   const carryover = Number(document.getElementById('newEventCarry').value) || 0;
   const autoAdd = document.getElementById('newEventAutoAdd').checked;
 
-  const members = autoAdd ? state.members.map(m => ({
+  const members = source ? copiedMembers(source) : autoAdd ? state.members.map(m => ({
     id: uid(),
     name: m.name,
     kana: m.kana || '',
@@ -839,8 +947,11 @@ function createEvent() {
   const ev = { id: uid(), name, date, note: '', carryover, completed: false, completedAt: null, expenses: [], members };
   state.events.push(ev);
   currentEventId = ev.id;
+  currentPage = 'events';
+  showUnpaidOnly = false;
   saveState();
   closeNewEventModal();
+  closeMobileSidebar();
   render();
 }
 
@@ -909,7 +1020,7 @@ function renderKnownMembers() {
   sec.style.display = '';
   el.innerHTML = sortMembers(state.members).map(m => {
     const already = existIds.has(m.id);
-    return `<div class="chip ${already ? 'added' : ''}" data-rid="${m.id}" data-name="${esc(m.name)}" title="${already ? 'すでに追加済み' : ''}">
+    return `<div class="chip ${already ? 'added' : ''}" data-rid="${esc(m.id)}" data-name="${esc(m.name)}" title="${already ? 'すでに追加済み' : ''}">
       ${esc(m.name)}${already ? ' ✓' : ''}
     </div>`;
   }).join('');
@@ -1038,9 +1149,10 @@ function deleteEvent() {
   if (!ev) return;
   openConfirmModal(
     `「${ev.name}」を削除しますか？`,
-    'この操作は取り消せません。',
+    '削除後、画面下の「取り消す」で戻せます（次の削除・再読み込みまで）。',
     () => {
-      state.events = state.events.filter(e => e.id !== currentEventId);
+      deleteWithUndo({ getList: () => state.events, item: ev, label: 'イベント',
+        onRestore: restored => { currentEventId = restored.id; currentPage = 'events'; } });
       currentEventId = state.events.length ? state.events[state.events.length - 1].id : null;
       saveState(); render();
     }
@@ -1073,40 +1185,42 @@ function closeConfirmModal() {
 // =============================================================
 /** 復元データを正規化し、壊れた/欠損フィールドを安全な既定値で補う */
 function normalizeState(raw) {
+  const safeId = value => typeof value === 'string' && value ? value : uid();
+  const finiteAmount = value => Number.isFinite(Number(value)) ? Number(value) : 0;
   const out = { events: [], members: [] };
   if (raw && Array.isArray(raw.events)) {
     out.events = raw.events.filter(e => e && typeof e === 'object').map(e => ({
-      id: e.id || uid(),
+      id: safeId(e.id),
       name: typeof e.name === 'string' ? e.name : '(無題)',
       date: typeof e.date === 'string' ? e.date : '',
       note: typeof e.note === 'string' ? e.note : '',
-      carryover: Number(e.carryover) || 0,
+      carryover: finiteAmount(e.carryover),
       completed: !!e.completed,
       completedAt: typeof e.completedAt === 'string' ? e.completedAt : null,
       expenses: Array.isArray(e.expenses)
         ? e.expenses.filter(x => x && typeof x === 'object').map(x => ({
-            id: x.id || uid(),
+            id: safeId(x.id),
             desc: typeof x.desc === 'string' ? x.desc : '',
-            amount: Number(x.amount) || 0,
+            amount: finiteAmount(x.amount),
           }))
         : [],
       members: Array.isArray(e.members)
         ? e.members.filter(x => x && typeof x === 'object').map(x => ({
-            id: x.id || uid(),
+            id: safeId(x.id),
             name: typeof x.name === 'string' ? x.name : '',
             kana: typeof x.kana === 'string' ? x.kana : '',
             attending: x.attending !== false,
-            amount: Number(x.amount) || 0,
+            amount: finiteAmount(x.amount),
             paid: !!x.paid,
             role: typeof x.role === 'string' ? x.role : '',
-            registeredId: x.registeredId,
+            registeredId: typeof x.registeredId === 'string' ? x.registeredId : undefined,
           }))
         : [],
     }));
   }
   if (raw && Array.isArray(raw.members)) {
     out.members = raw.members.filter(m => m && typeof m === 'object').map(m => ({
-      id: m.id || uid(),
+      id: safeId(m.id),
       name: typeof m.name === 'string' ? m.name : '',
       kana: typeof m.kana === 'string' ? m.kana : '',
       role: typeof m.role === 'string' ? m.role : '',
@@ -1168,14 +1282,19 @@ function exportBackup() {
 }
 
 function importBackup(file) {
+  if (file.size > 10 * 1024 * 1024) {
+    alert('バックアップは10MB以下のJSONファイルを選んでください。');
+    return;
+  }
   const reader = new FileReader();
   reader.onload = e => {
     try {
       const parsed = JSON.parse(e.target.result);
       const imported = parsed.state || parsed;
       if (!imported || !Array.isArray(imported.events)) throw new Error('Invalid format');
+      const restoredState = normalizeState(imported);
       if (!confirm('バックアップを復元しますか？現在のデータはすべて置き換えられます。')) return;
-      state = normalizeState(imported);
+      state = restoredState;
       currentEventId = (parsed.currentEventId && state.events.find(ev => ev.id === parsed.currentEventId))
         ? parsed.currentEventId
         : (state.events.length ? state.events[state.events.length - 1].id : null);
@@ -1185,6 +1304,7 @@ function importBackup(file) {
       alert('ファイルの形式が正しくありません。');
     }
   };
+  reader.onerror = () => alert('ファイルを読み込めませんでした。');
   reader.readAsText(file);
 }
 
@@ -1348,7 +1468,7 @@ function renderDashboard() {
     const s = calcSummary(ev);
     const attendCount = (ev.members || []).filter(m => m.attending !== false).length;
     const unpaidCount = (ev.members || []).filter(m => (Number(m.amount) || 0) > 0 && !m.paid).length;
-    return `<tr class="dash-row" data-id="${ev.id}" role="button" tabindex="0">
+    return `<tr class="dash-row" data-id="${esc(ev.id)}" role="button" tabindex="0">
       <td class="dash-name">${esc(ev.name)}</td>
       <td>${ev.date ? esc(dateLabel(ev.date)) : '—'}</td>
       <td class="num">${attendCount}名</td>
@@ -1425,7 +1545,7 @@ function renderMembersPage() {
       ? `<div class="member-kana">${esc(m.kana)}</div>`
       : '<div class="member-kana is-empty">よみがな未設定</div>';
     return `
-    <div class="member-item${canDrag ? ' draggable' : ''}" data-rid="${m.id}">
+    <div class="member-item${canDrag ? ' draggable' : ''}" data-rid="${esc(m.id)}">
       ${handle}
       <div class="member-avatar" style="background:linear-gradient(135deg,${role.color}cc,${role.color}88)">${esc(m.name.slice(0, 2))}</div>
       <div style="flex:1;min-width:0">
@@ -1434,11 +1554,11 @@ function renderMembersPage() {
         ${m.role ? `<div class="role-badge" style="color:${role.color};background:${role.bg}">${role.label}</div>` : ''}
       </div>
       <div class="member-controls">
-        <select class="role-select" data-rid="${m.id}" title="役職を選択">
+        <select class="role-select" data-rid="${esc(m.id)}" title="役職を選択">
           ${roleOptionsHTML(m.role)}
         </select>
-        <button class="expense-btn edit-global-member" data-rid="${m.id}" title="編集">✏️ 編集</button>
-        <button class="member-remove del-global-member" data-rid="${m.id}" title="削除">✕</button>
+        <button class="expense-btn edit-global-member" data-rid="${esc(m.id)}" title="編集">✏️ 編集</button>
+        <button class="member-remove del-global-member" data-rid="${esc(m.id)}" title="削除">✕</button>
       </div>
     </div>`;
   }).join('');
@@ -1469,7 +1589,10 @@ function renderMembersPage() {
       openConfirmModal(
         `「${m.name}」を削除しますか？`,
         'イベント内の参加者情報は残ります。',
-        () => { state.members = state.members.filter(m2 => m2.id !== btn.dataset.rid); saveState(); render(); }
+        () => {
+          deleteWithUndo({ getList: () => state.members, item: m, label: '登録メンバー' });
+          saveState(); render();
+        }
       );
     });
   });
@@ -1631,6 +1754,9 @@ document.addEventListener('DOMContentLoaded', () => {
     el.addEventListener('change', scheduleEventSettingsSave);
   });
   document.getElementById('btnToggleComplete').addEventListener('click', toggleComplete);
+  document.getElementById('btnCopyEvent').addEventListener('click', openCopyEventModal);
+  document.getElementById('btnUndoDelete').addEventListener('click', undoDelete);
+  document.getElementById('btnDismissUndo').addEventListener('click', dismissUndo);
   document.getElementById('btnDeleteEvent').addEventListener('click', deleteEvent);
   document.getElementById('btnPrintReport').addEventListener('click', printReport);
   window.addEventListener('beforeprint', preparePrintReport);

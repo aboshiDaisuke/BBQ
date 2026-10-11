@@ -28,6 +28,8 @@
   let currentUser = null;
   let pushTimer = null;
   let paused = false; // クラウド→端末の取り込み中は push を止める
+  let syncReady = false; // 初回読み込みに成功するまで自動・手動の上書きを防ぐ
+  const syncedKey = user => `${SYNCED_KEY}:${user.uid}`;
 
   // ---- 小物 ---------------------------------------------------
   const $ = id => document.getElementById(id);
@@ -59,52 +61,61 @@
   // ---- Firestore 通信 -----------------------------------------
   async function fetchCloud() {
     if (!db || !currentUser) return null;
+    const user = currentUser;
     try {
-      const snap = await db.collection('app_state').doc(currentUser.uid).get();
+      const snap = await db.collection('app_state').doc(user.uid).get();
+      if (currentUser !== user) throw new Error('Cloud session changed');
       if (!snap.exists) return null;
       const d = snap.data() || {};
-      let payload = null;
-      try { payload = d.json ? JSON.parse(d.json) : null; }
-      catch (e) { console.warn('[cloud] broken cloud json', e); }
+      const payload = JSON.parse(d.json);
+      if (!payload || !payload.state || !Array.isArray(payload.state.events) ||
+          !Array.isArray(payload.state.members)) throw new Error('Invalid cloud data');
       return { data: payload, updated_at: d.updatedAt || null };
     } catch (error) {
       console.warn('[cloud] fetch error', error);
-      return null;
+      throw error;
     }
   }
 
   async function pushToCloud() {
-    if (!db || !currentUser) return;
+    if (!db || !currentUser || paused) return;
+    const user = currentUser;
     setCloudInfo('同期中…');
     const payload = { state, currentEventId };
     const updatedAt = new Date().toISOString();
     try {
-      await db.collection('app_state').doc(currentUser.uid).set({
+      await db.collection('app_state').doc(user.uid).set({
         json: JSON.stringify(payload),
         updatedAt,
       });
     } catch (error) {
       console.warn('[cloud] push error', error);
       setCloudInfo('⚠️ 同期エラー', true);
-      return;
+      return false;
     }
-    localStorage.setItem(SYNCED_KEY, updatedAt);
+    if (currentUser !== user) return false;
+    localStorage.setItem(syncedKey(user), updatedAt);
     setCloudInfo('🌥️ 同期済み ' + nowLabel());
+    return true;
   }
 
   // クラウドの内容を端末（state/localStorage）へ取り込む
   function adoptCloud(row) {
     const d = (row && row.data) || {};
     paused = true;
-    state = normalizeState(d.state || d);
-    currentEventId = (d.currentEventId && state.events.find(e => e.id === d.currentEventId))
-      ? d.currentEventId
-      : (state.events.length ? state.events[state.events.length - 1].id : null);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ state, currentEventId }));
-    if (row && row.updated_at) localStorage.setItem(SYNCED_KEY, row.updated_at);
-    paused = false;
-    if (typeof render === 'function') render();
-    setCloudInfo('🌥️ クラウドから読み込みました ' + nowLabel());
+    clearTimeout(pushTimer);
+    try {
+      const nextState = normalizeState(d.state || d);
+      const nextEventId = (d.currentEventId && nextState.events.find(e => e.id === d.currentEventId))
+        ? d.currentEventId
+        : (nextState.events.length ? nextState.events[nextState.events.length - 1].id : null);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ state: nextState, currentEventId: nextEventId }));
+      state = nextState;
+      currentEventId = nextEventId;
+      if (row && row.updated_at && currentUser) localStorage.setItem(syncedKey(currentUser), row.updated_at);
+      if (typeof render === 'function') render();
+      setCloudInfo('🌥️ クラウドから読み込みました ' + nowLabel());
+    } finally { paused = false; }
   }
 
   // ---- ログイン直後の同期（吸い上げ／取り込みの判定） --------
@@ -112,7 +123,7 @@
     const row = await fetchCloud();
     const cloudHas = row && cloudHasData(row.data);
     const localHas = localHasData();
-    const lastSynced = localStorage.getItem(SYNCED_KEY);
+    const lastSynced = localStorage.getItem(syncedKey(currentUser));
 
     if (cloudHas && localHas) {
       if (row.updated_at && lastSynced === row.updated_at) {
@@ -130,8 +141,7 @@
       adoptCloud(row);
     } else if (!cloudHas && localHas) {
       // 初回：この端末のデータをクラウドへ吸い上げ
-      await pushToCloud();
-      setCloudInfo('🌥️ この端末のデータをクラウドに保存しました');
+      if (await pushToCloud()) setCloudInfo('🌥️ この端末のデータをクラウドに保存しました');
     } else {
       setCloudInfo('🌥️ ログイン中（データはまだありません）');
     }
@@ -140,6 +150,7 @@
 
   // ---- 認証 ---------------------------------------------------
   async function doLogin() {
+    if (!auth || $('btnCloudLogin').disabled) return;
     const idInput = ($('cloudEmail').value || '').trim();
     const password = $('cloudPassword').value || '';
     if (!idInput || !password) { setLoginError('IDとパスワードを入力してください。'); return; }
@@ -162,6 +173,8 @@
   }
 
   async function doLogout() {
+    clearTimeout(pushTimer);
+    syncReady = false;
     if (auth) await auth.signOut();
     currentUser = null;
     updateCloudUI();
@@ -169,14 +182,22 @@
   }
 
   // ---- 手動操作 -----------------------------------------------
-  async function manualPush() { await pushToCloud(); }
+  async function manualPush() {
+    if (!syncReady) { setCloudInfo('読み込み未完了です。再ログインして同期を確認してください。', true); return; }
+    await pushToCloud();
+  }
 
   async function manualPull() {
-    const row = await fetchCloud();
-    if (!row || !cloudHasData(row.data)) { setCloudInfo('クラウドにデータがありません'); return; }
-    if (localHasData() &&
-      !confirm('この端末の内容を、クラウドの内容で置き換えます。よろしいですか？')) return;
-    adoptCloud(row);
+    if (!syncReady) { setCloudInfo('再ログインして同期を確認してください。', true); return; }
+    try {
+      const row = await fetchCloud();
+      if (!row || !cloudHasData(row.data)) { setCloudInfo('クラウドにデータがありません'); return; }
+      if (localHasData() &&
+        !confirm('この端末の内容を、クラウドの内容で置き換えます。よろしいですか？')) return;
+      adoptCloud(row);
+    } catch {
+      setCloudInfo('⚠️ 読み込みに失敗しました。端末のデータは変更していません。', true);
+    }
   }
 
   // ---- 画面更新 -----------------------------------------------
@@ -219,15 +240,19 @@
     if (configured && !currentUser) { const e = $('cloudEmail'); if (e) e.focus(); }
   }
   function closeCloudModal() {
+    $('cloudPassword').value = '';
     const m = $('modalCloud');
     if (m) m.classList.add('hidden');
   }
 
   // ---- saveState からのフック（自動アップロード） -------------
   window.__cloudPush = function () {
-    if (paused || !db || !currentUser) return;
+    if (paused || !syncReady || !db || !currentUser) return;
     clearTimeout(pushTimer);
-    pushTimer = setTimeout(pushToCloud, PUSH_DELAY);
+    const user = currentUser;
+    pushTimer = setTimeout(() => {
+      if (syncReady && currentUser === user) pushToCloud();
+    }, PUSH_DELAY);
   };
 
   // ---- 初期化 -------------------------------------------------
@@ -259,11 +284,19 @@
     // （手動ログインも自動復元も、この listener 経由で同期が走る）
     if (auth) {
       auth.onAuthStateChanged(async user => {
-        if (user && !currentUser) {
+        clearTimeout(pushTimer);
+        if (user && (!currentUser || currentUser.uid !== user.uid)) {
+          syncReady = false;
           currentUser = user;
           updateCloudUI();
-          await syncOnLogin();
+          try {
+            await syncOnLogin();
+            if (currentUser === user) syncReady = true;
+          } catch {
+            if (currentUser === user) setCloudInfo('⚠️ 読み込みに失敗したため同期を停止しました。再ログインしてください。', true);
+          }
         } else if (!user) {
+          syncReady = false;
           currentUser = null;
           updateCloudUI();
         }
