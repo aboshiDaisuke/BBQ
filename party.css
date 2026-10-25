@@ -169,7 +169,7 @@ button:disabled { cursor: not-allowed; }
 .splash-inner { border: 1px solid #efc5da; box-shadow: 8px 8px 0 #d881ac20, 0 20px 80px #ae4c7e15; }
 .splash-title { color: #372538; font-weight: 900; }
 .splash-badge { color: #a42560; font-family: var(--font-display); font-size: 10px; letter-spacing: 1.5px; background: #fff0f7; }
-.splash-start { font-size: 15px; animation: none; min-height: 48px; }
+.splash-start { font-size: 15px; min-height: 48px; }
 .splash-tagline { color: #765669; }
 .mobile-avatar { border-radius: 12px; border: 2px solid #fff; box-shadow: 0 0 0 1px #efc4d9; }
 @media (min-width: 701px) and (max-width: 1150px) {
