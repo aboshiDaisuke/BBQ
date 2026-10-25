@@ -1391,6 +1391,63 @@ function buildReportHTML(ev) {
   `;
 }
 
+// 手書きでチェックするための集金シート。アプリの支払い状態は反映せず、
+// 全員空欄のチェック欄で出す。飛び入り用の空行も末尾に付ける。
+const SHEET_BLANK_ROWS = 3;
+
+function buildCollectionSheetHTML(ev) {
+  // 不参加者から集金することもあるので出欠を問わず全員載せる
+  const targets = sortMembersBy(ev.members || [], getMemberSort());
+  const total = targets.reduce((s, m) => s + (Number(m.amount) || 0), 0);
+  const amounts = [...new Set(targets.map(m => Number(m.amount) || 0).filter(a => a > 0))];
+  const perPerson = amounts.length === 1 ? amounts[0] : 0;
+  // インク節約のためイベント名の絵文字は落とす
+  const title = String(ev.name || '').replace(/[\p{Extended_Pictographic}\u200D\uFE0F]/gu, '').trim();
+
+  const row = (no, name, amount, memo = '') => `<tr>
+      <td class="cs-no">${no}</td>
+      <td class="cs-name">${name}</td>
+      <td class="cs-amount">${amount}</td>
+      <td class="cs-check"><span class="cs-box"></span></td>
+      <td class="cs-memo">${memo}</td>
+    </tr>`;
+  const rows = targets.map((m, i) =>
+    row(i + 1, esc(m.name), (Number(m.amount) || 0) > 0 ? fmt(m.amount) : '',
+      m.attending === false ? '<span class="cs-absent">不参加</span>' : '')
+  ).join('') + Array.from({ length: SHEET_BLANK_ROWS }, (_, i) =>
+    row(targets.length + i + 1, '', '')
+  ).join('');
+
+  return `
+    <div class="cs-head">
+      <div class="cs-title">集金シート</div>
+      <div class="cs-event">${esc(title)}</div>
+      <div class="cs-meta">
+        <span>${esc(dateLabel(ev.date))}</span>
+        ${perPerson ? `<span>1人 <b>${fmt(perPerson)}</b></span>` : ''}
+        <span>対象 <b>${targets.length}名</b></span>
+        <span>集金予定 <b>${fmt(total)}</b></span>
+      </div>
+    </div>
+
+    <table class="cs-table">
+      <thead><tr>
+        <th class="cs-no">No</th><th class="cs-name">名前</th><th class="cs-amount">金額</th>
+        <th class="cs-check">受取</th><th class="cs-memo">メモ</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+
+    <div class="cs-foot">
+      <div class="cs-tally">集金済み <span class="cs-line short"></span> 名 ／ <span class="cs-line"></span> 円</div>
+      <div class="cs-tally">受取者 <span class="cs-line long"></span></div>
+    </div>
+  `;
+}
+
+// 'report'（PDFレポート）か 'sheet'（集金シート）。Cmd/Ctrl+P はレポート。
+let printMode = 'report';
+
 // 現在のイベント内容を印刷用レポートに反映する。内容があるときだけ
 // body に .printing を付け、ブラウザ標準の印刷（Cmd/Ctrl+P）でも同じ
 // レポートが出るようにする。内容が無ければ画面をそのまま印刷させる。
@@ -1403,12 +1460,13 @@ function preparePrintReport() {
     document.body.classList.remove('printing');
     return false;
   }
-  el.innerHTML = buildReportHTML(ev);
+  el.innerHTML = printMode === 'sheet' ? buildCollectionSheetHTML(ev) : buildReportHTML(ev);
   document.body.classList.add('printing');
   return true;
 }
 
 function clearPrintReport() {
+  printMode = 'report';
   document.body.classList.remove('printing');
   const el = document.getElementById('printReport');
   if (el) el.innerHTML = '';
@@ -1416,7 +1474,14 @@ function clearPrintReport() {
 
 function printReport() {
   // 印刷ダイアログの送信先で「PDFとして保存」を選べる
+  printMode = 'report';
   if (preparePrintReport()) window.print();
+}
+
+function printCollectionSheet() {
+  printMode = 'sheet';
+  if (preparePrintReport()) window.print();
+  else printMode = 'report';
 }
 
 // =============================================================
@@ -1759,6 +1824,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnDismissUndo').addEventListener('click', dismissUndo);
   document.getElementById('btnDeleteEvent').addEventListener('click', deleteEvent);
   document.getElementById('btnPrintReport').addEventListener('click', printReport);
+  document.getElementById('btnPrintSheet').addEventListener('click', printCollectionSheet);
   window.addEventListener('beforeprint', preparePrintReport);
   window.addEventListener('afterprint', clearPrintReport);
 

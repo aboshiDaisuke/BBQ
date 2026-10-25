@@ -1386,6 +1386,30 @@ body.dragging-active { user-select: none; -webkit-user-select: none; cursor: gra
 
   .pr-table tr { page-break-inside: avoid; }
   .pr-table thead { display: table-header-group; }
+
+  /* 集金シート：インク節約のため塗りなし・細い罫線だけ */
+  .cs-head { border-bottom: 1px solid #000; padding-bottom: 10px; margin-bottom: 16px; }
+  .cs-title { font-size: 12px; letter-spacing: 4px; color: #555; }
+  .cs-event { font-size: 22px; font-weight: 700; margin-top: 4px; }
+  .cs-meta { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 14px; margin-top: 8px; }
+  .cs-meta b { font-size: 16px; }
+
+  .cs-table { width: 100%; border-collapse: collapse; font-size: 16px; }
+  .cs-table th, .cs-table td { border: 1px solid #666; padding: 0 10px; height: 11mm; }
+  .cs-table th { height: 8mm; font-size: 12px; font-weight: 700; text-align: center; }
+  .cs-table .cs-no { width: 10mm; text-align: center; color: #555; font-size: 13px; }
+  .cs-table .cs-amount { width: 30mm; text-align: right; font-variant-numeric: tabular-nums; }
+  .cs-table .cs-check { width: 18mm; text-align: center; }
+  .cs-table .cs-memo { width: 52mm; }
+  .cs-absent { font-size: 12px; color: #666; }
+  .cs-box { display: inline-block; width: 7mm; height: 7mm; border: 1px solid #000; border-radius: 2px; vertical-align: middle; }
+  .cs-table tr { page-break-inside: avoid; }
+  .cs-table thead { display: table-header-group; }
+
+  .cs-foot { display: flex; justify-content: space-between; gap: 20px; margin-top: 22px; font-size: 15px; page-break-inside: avoid; }
+  .cs-line { display: inline-block; width: 36mm; border-bottom: 1px solid #000; height: 1.2em; vertical-align: bottom; }
+  .cs-line.short { width: 16mm; }
+  .cs-line.long { width: 50mm; }
 }
 
 /* ===================================================
