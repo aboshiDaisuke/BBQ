@@ -221,17 +221,33 @@ input:focus-visible, select:focus-visible, .splash-start:focus-visible {
   100% { opacity: 0; transform: translate3d(36px, 105vh, 0); }
 }
 
-/* Visible ornaments in decorative whitespace, clear of accounting controls. */
-.christmas-float-stage {
-  position: fixed;
+/* A snowy 3D diorama (tree, presents, reindeer, snowman) inside the hero.
+   CSS reserves the slot; christmas-scene.js fits the scene into it. Without
+   WebGL the class is never added and the hero keeps its original layout. */
+.hero-diorama { display: none; pointer-events: none; }
+.hero-scene-canvas {
+  position: absolute;
   inset: 0;
-  overflow: hidden;
+  z-index: 0;
+  display: block;
   pointer-events: none;
-  z-index: 101;
-  opacity: 1;
 }
-.christmas-float-stage canvas { position: absolute; inset: 0; display: block; max-width: 100%; }
+.party-hero.has-3d-scene .hero-diorama { display: block; }
 .christmas-motion-toggle[aria-pressed="true"] { color: #9b3443; }
+
+/* Wide: copy | diorama | Santa, side by side. */
+@media (min-width: 1360px) {
+  .party-hero.has-3d-scene { min-height: 262px; }
+  .has-3d-scene .party-hero-copy { width: 440px; flex: none; }
+  .has-3d-scene .hero-diorama { position: absolute; left: 420px; right: 232px; top: 30px; bottom: 4px; }
+}
+/* Narrower: the diorama becomes a snowy stage below the copy, while Santa
+   keeps her own column on the right and stands level with the snow. */
+@media (max-width: 1359px) {
+  .party-hero.has-3d-scene { flex-direction: column; align-items: stretch; }
+  .has-3d-scene .party-hero-copy { padding-bottom: 0; }
+  .has-3d-scene .hero-diorama { position: relative; flex: none; height: 200px; margin: -4px 196px 10px 12px; }
+}
 
 @media (min-width: 701px) and (max-width: 1150px) {
   .hero-character { right: 12px; }
@@ -239,7 +255,8 @@ input:focus-visible, select:focus-visible, .splash-start:focus-visible {
   .party-hero .mini-label { font-size: 8px; letter-spacing: 1px; }
 }
 @media (max-width: 700px) {
-  body:has(.sidebar.open) .christmas-float-stage { visibility: hidden; }
+  .has-3d-scene .party-hero-art { top: 0; bottom: auto; }
+  .has-3d-scene .hero-diorama { height: 150px; margin: 2px 4px 8px; }
   .mobile-header { background: #fffcf5f5; border-color: var(--border); }
   .mobile-title, .menu-btn { color: var(--christmas-pine); }
   .page-eyebrow { flex-wrap: wrap; row-gap: 4px; }
@@ -288,7 +305,7 @@ input:focus-visible, select:focus-visible, .splash-start:focus-visible {
 }
 @media print {
   body { background: white; }
-  .christmas-lights, .christmas-float-stage, .christmas-motion-toggle { display: none !important; }
+  .christmas-lights, .hero-scene-canvas, .hero-diorama, .christmas-motion-toggle { display: none !important; }
   .pr-head { border-bottom-color: var(--christmas-pine); }
   .pr-section { border-left-color: var(--christmas-pine); }
 }
