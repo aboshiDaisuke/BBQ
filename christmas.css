@@ -1,0 +1,294 @@
+/* Christmas presentation layer. Event data and accounting behavior stay in app.js. */
+:root {
+  --bg: #faf7ef;
+  --bg-2: #f6eadd;
+  --bg-hover: #f5eee2;
+  --bg-sidebar: #fffcf5;
+  --text-primary: #253e35;
+  --text-secondary: #687266;
+  --text-tertiary: #77796b;
+  --blue: #b33343;
+  --blue-hover: #972839;
+  --blue-light: #fbecee;
+  --coral-deep: #862936;
+  --green: #236a50;
+  --green-deep: #19553f;
+  --green-light: #e7f1e9;
+  --red: #b02c3e;
+  --red-deep: #922437;
+  --red-light: #fbe9e9;
+  --violet: #816637;
+  --amber: #d5ad61;
+  --border: #e5dece;
+  --border-strong: #cdc3ab;
+  --shadow-sm: 0 4px 16px #30453608;
+  --shadow-md: 0 10px 28px #30453610;
+  --shadow-lg: 0 28px 64px #173f3524;
+  --christmas-pine: #173f35;
+  --christmas-gold: #e5c68a;
+}
+
+body {
+  background: radial-gradient(circle, #b6a47d26 1px, transparent 1px) 0 0 / 24px 24px, var(--bg);
+  animation: none;
+}
+button:focus-visible, a:focus-visible, [role="button"]:focus-visible,
+input:focus-visible, select:focus-visible, .splash-start:focus-visible {
+  outline-color: #947035;
+}
+.sidebar { background: var(--bg-sidebar); box-shadow: 4px 0 24px #173f3505; }
+.sidebar-header { border-top: 5px solid var(--christmas-pine); padding-top: 22px; }
+.app-icon, .mobile-avatar { box-shadow: 0 0 0 1px #c5ae7e; }
+.brand-eyebrow { color: #816637; font-size: 9px; letter-spacing: 1px; }
+.brand-heart { color: var(--blue); }
+.event-item.active { background: #edf3ec; border-color: #bdcdbb; }
+.event-item.active .event-item-name { color: var(--christmas-pine); }
+.sidebar-nav-btn.active { border-color: #dab4b7; }
+.new-event-btn, .btn-primary, .splash-start, .btn-icon-circle {
+  background: var(--blue);
+  box-shadow: 0 3px 0 var(--coral-deep), 0 6px 14px #86293612;
+}
+.new-event-btn:hover, .btn-primary:hover, .splash-start:hover, .btn-icon-circle:hover {
+  background: var(--blue-hover);
+  box-shadow: 0 4px 0 var(--coral-deep), 0 8px 18px #8629361a;
+}
+.new-event-btn:active, .btn-primary:active, .splash-start:active, .btn-icon-circle:active {
+  box-shadow: 0 1px 0 var(--coral-deep);
+}
+.sidebar-cheer { background: #edf3eb; border-color: #b5c6ad; }
+.sidebar-cheer span { color: var(--christmas-pine); }
+.backup-banner { background: #fff6e3; border-color: #e5cfa3; box-shadow: none; }
+.page-eyebrow { color: var(--text-secondary); }
+.page-eyebrow > :first-child, .mini-label, .section-eyebrow { color: #816637; }
+.event-shortcuts a { color: #465e4e; border-color: var(--border); }
+.event-shortcuts a:hover { background: #edf3eb; border-color: #a7bda3; }
+.detail-actions .btn-destructive-sm { color: #78645c; }
+
+/* A quiet evergreen backdrop with snow and hanging glass ornaments. */
+.party-hero {
+  min-height: 240px;
+  background:
+    radial-gradient(circle at 78% 26%, #fff9e66b 0 1px, transparent 2px),
+    radial-gradient(circle at 94% 66%, #fff9e66b 0 1px, transparent 2px),
+    radial-gradient(circle at 51% 83%, #fff9e64d 0 1px, transparent 2px),
+    radial-gradient(ellipse at 90% 100%, #42634c, transparent 65%),
+    var(--christmas-pine);
+  border-color: #284c3d;
+  box-shadow: 0 7px 22px #173f3510;
+  isolation: isolate;
+}
+.party-hero::after {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border: 1px solid #e5c68a45;
+  border-radius: 19px;
+  pointer-events: none;
+}
+.party-hero-copy { padding-top: 40px; padding-bottom: 26px; }
+.party-hero .mini-label { color: var(--christmas-gold); font-size: 9px; letter-spacing: 1.5px; }
+.party-hero h2 { color: #fff9eb; }
+.party-hero h2 span { color: var(--christmas-gold); }
+.party-hero p { color: #dce6d8; }
+.hero-orbit { background: #e4edcc0d; border-color: #e5c68a66; }
+.hero-star { color: var(--christmas-gold); font-size: 28px; }
+.hero-heart { color: var(--christmas-gold); }
+.christmas-lights {
+  position: absolute;
+  top: -9px;
+  left: 6%;
+  width: 88%;
+  height: 27px;
+  display: flex;
+  justify-content: space-around;
+  border-bottom: 1px solid #c7ac7080;
+  border-radius: 0 0 50% 50%;
+  pointer-events: none;
+  z-index: 2;
+}
+.christmas-lights i {
+  position: relative;
+  display: block;
+  flex-shrink: 0;
+  margin-top: 25px;
+  width: 9px;
+  height: 12px;
+  background: #f1d397;
+  border-radius: 40% 40% 50% 50%;
+  box-shadow: 0 0 12px #e9bd6566;
+}
+.christmas-lights i::before { content: ''; position: absolute; width: 1px; height: 6px; background: #c7ac70; top: -6px; left: 4px; }
+.christmas-lights i:nth-child(3n + 1) { background: #dc7e78; box-shadow: 0 0 12px #dc7e784d; }
+.christmas-lights i:nth-child(3n) { background: #adc8a1; box-shadow: 0 0 12px #adc8a14d; }
+.christmas-lights i:first-child, .christmas-lights i:last-child { margin-top: 18px; }
+.christmas-lights i:nth-child(2), .christmas-lights i:nth-last-child(2) { margin-top: 23px; }
+
+/* Generated Santa artwork; animation belongs to the complete character. */
+.festive-mascot { position: relative; display: inline-block; flex-shrink: 0; width: 152px; height: 270px; }
+.splash-character { animation: splashPop .9s cubic-bezier(.2,1.3,.35,1) both, splashFloat 3.4s ease-in-out 1s infinite; }
+.splash-character .splash-mascot, .empty-character img, .party-hero-art .hero-character img {
+  position: static;
+  display: block;
+  height: 100%;
+  width: 100%;
+  object-fit: contain;
+  transform: none;
+  animation: none;
+  filter: drop-shadow(0 8px 12px #173f3520);
+}
+.empty-character { transform: rotate(5deg); }
+.hero-character { position: absolute; height: 207px; width: 116.5px; right: 32px; top: 4px; transform: rotate(4deg); }
+.party-hero-art .hero-character img { filter: drop-shadow(0 4px 0 #fff9ebbf) drop-shadow(0 8px 12px #102f3526); }
+
+/* Functional surfaces keep distinct positive and negative money colors. */
+#cardCarry .summary-icon { background: #f6ecd6; }
+#cardCarry .summary-amount { color: #85632c; }
+#cardCollected .summary-icon { background: #e7f1e9; }
+#cardSpent .summary-icon, .per-person-icon { background: #fbe9e9; }
+.balance-card { background: var(--christmas-pine); border-color: var(--christmas-pine); }
+.balance-card .summary-label, .balance-card .summary-sub { color: #e8ecdc; }
+.balance-card.negative { background: #982c3d; border-color: #982c3d; }
+.per-person-label, .field-label { color: #4c5c4c; }
+.carry-forward-bar { background: #edf3eb; border-color: #c6d5be; }
+.section-number { background: #f5ebd7; color: #85632c; }
+.field-input { background: #fffdf8; border-color: var(--border-strong); }
+.field-input:focus { border-color: var(--blue); }
+.member-toolbar, .modal-footer, .dash-table th, .collection-progress { background: #faf7ef; }
+.paid-badge.unpaid { border-color: #e0b6b5; }
+.member-toolbar-info { color: var(--blue); }
+.modal-overlay { background: #18372f66; }
+.copy-event-note { background: #f4efe2; color: #655a42; }
+.collection-progress-heading, #collectionProgressHint { color: #53634c; }
+#collectionProgressPercent { color: var(--christmas-pine); }
+.collection-progress-track { background: #e5e7d9; }
+#collectionProgressFill { background: linear-gradient(90deg, #96ad7c, #32694e); }
+.undo-toast { background: var(--christmas-pine); box-shadow: 0 8px 28px #173f3530; }
+.undo-toast small, .undo-toast .undo-dismiss { color: #e2e8d7; }
+.undo-toast button { background: #f7ecd4; color: #714f25; }
+
+.empty-state { padding-top: 48px; }
+.empty-icon, .empty-icon--img {
+  background: radial-gradient(circle at 50% 35%, #fffdf4, #e3eddd);
+  border-color: #b7ba8f;
+  box-shadow: 0 0 0 9px #fffaf0, 0 0 0 10px #d4c6a4;
+}
+.empty-title { color: var(--christmas-pine); }
+.empty-float { color: #987333; filter: none; }
+.empty-float.f1 { font-size: 28px; }
+.empty-float.f2 { font-size: 27px; }
+.empty-float.f3 { font-size: 25px; }
+.welcome-steps li { color: #64715c; }
+.welcome-steps b { color: var(--blue); }
+
+/* The welcome card feels like a little Christmas greeting card. */
+.splash { background: #edf0e5; }
+.splash-veil {
+  background:
+    radial-gradient(circle, #fffef5b3 1.5px, transparent 2px) 0 0 / 35px 35px,
+    radial-gradient(ellipse at 50% 42%, #fffaf0 15%, #e4ebdc 100%);
+  animation: none;
+}
+.splash-inner {
+  background: #fffdf6;
+  border-color: #cbb98f;
+  box-shadow: 7px 7px 0 #254d3510, 0 20px 80px #254d3512;
+  padding-top: 33px;
+}
+.christmas-greeting { font-family: Georgia, 'Times New Roman', serif; font-style: italic; color: #8c652f; font-size: 26px; letter-spacing: .5px; margin-bottom: 35px; }
+.splash-mascot-wrap { height: 250px; margin-bottom: 4px; }
+.splash-character { width: 135px; height: 240px; }
+.splash-glow { background: radial-gradient(circle, #dce8cc 0%, #ede0b44d 45%, transparent 72%); }
+.splash-ring { border-color: #a2b18b99; border-width: 2px; }
+.splash-badge { color: #6a623c; background: #f4efdf; border-color: #e4d9bb; letter-spacing: 1px; }
+.splash-title span { color: var(--blue); text-shadow: 0 3px 0 #f4dfd7; }
+.splash-title span.is-sub { color: var(--christmas-pine); text-shadow: 0 3px 0 #e5e9d6; }
+.splash-title span.splash-title-heart { color: #9a7437; }
+.splash-tagline { color: #64715c; }
+.splash-start { border-radius: 12px; }
+.splash-sparkle { color: #8b9d79; filter: none; }
+.splash-bubbles span {
+  top: -30px;
+  bottom: auto;
+  width: calc(var(--s) * .5);
+  height: calc(var(--s) * .5);
+  background: #fffef7;
+  border: none;
+  animation: christmasSnow var(--d) linear var(--w) infinite;
+}
+@keyframes christmasSnow {
+  0% { opacity: 0; transform: translate3d(0, -10px, 0); }
+  15%, 80% { opacity: .85; }
+  100% { opacity: 0; transform: translate3d(36px, 105vh, 0); }
+}
+
+/* Visible ornaments in decorative whitespace, clear of accounting controls. */
+.christmas-float-stage {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 101;
+  opacity: 1;
+}
+.christmas-float-stage canvas { position: absolute; inset: 0; display: block; max-width: 100%; }
+.christmas-motion-toggle[aria-pressed="true"] { color: #9b3443; }
+
+@media (min-width: 701px) and (max-width: 1150px) {
+  .hero-character { right: 12px; }
+  .party-hero h2 { font-size: 27px; }
+  .party-hero .mini-label { font-size: 8px; letter-spacing: 1px; }
+}
+@media (max-width: 700px) {
+  body:has(.sidebar.open) .christmas-float-stage { visibility: hidden; }
+  .mobile-header { background: #fffcf5f5; border-color: var(--border); }
+  .mobile-title, .menu-btn { color: var(--christmas-pine); }
+  .page-eyebrow { flex-wrap: wrap; row-gap: 4px; }
+  .page-eyebrow > :first-child { font-size: 9px; letter-spacing: .7px; }
+  .party-hero { min-height: 220px; }
+  .party-hero-copy { padding: 39px 17px 26px; width: 78%; }
+  .party-hero .mini-label { font-size: 7px; letter-spacing: .6px; }
+  .party-hero h2 { font-size: clamp(21px, 5.5vw, 26px); }
+  .party-hero h2 span { font-size: .65em; padding-left: 2px; }
+  .party-hero p { font-size: 10px; }
+  .hero-character { top: 2px; right: 24px; height: 170px; width: 96px; }
+  .hero-star { font-size: 20px; }
+  .empty-state { padding-top: 45px; }
+  .empty-title { font-size: clamp(20px, 5.6vw, 28px); }
+  .empty-desc { font-size: 12px; }
+}
+@media (max-width: 360px) {
+  .party-hero-copy { padding-left: 15px; width: 82%; }
+  .party-hero h2 { font-size: 20px; }
+  .party-hero .mini-label { font-size: 6.5px; }
+  .hero-character { right: 27px; }
+  .splash-inner { padding-right: 22px; padding-left: 22px; }
+  .splash-badge { font-size: 9px; }
+  .splash-tagline { font-size: 12px; }
+}
+@media (max-height: 740px) {
+  .splash-inner { padding-top: 28px; padding-bottom: 22px; }
+  .christmas-greeting { font-size: 23px; margin-bottom: 29px; }
+  .splash-mascot-wrap { height: 192px; }
+  .splash-character { height: 190px; width: 107px; }
+  .splash-glow, .splash-ring { width: 170px; height: 170px; }
+  .splash-title { font-size: 28px; }
+  .splash-start { margin-top: 16px; }
+}
+@media (max-height: 540px) {
+  .splash { overflow-y: auto; justify-content: flex-start; padding: 18px 0; }
+  .splash-inner { flex-shrink: 0; }
+  .christmas-greeting { margin-bottom: 20px; }
+  .splash-mascot-wrap { height: 115px; }
+  .splash-character { height: 115px; width: 65px; }
+  .splash-glow, .splash-ring { width: 115px; height: 115px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .splash-character, .splash-bubbles span { animation: none; }
+  .splash-bubbles { display: none; }
+}
+@media print {
+  body { background: white; }
+  .christmas-lights, .christmas-float-stage, .christmas-motion-toggle { display: none !important; }
+  .pr-head { border-bottom-color: var(--christmas-pine); }
+  .pr-section { border-left-color: var(--christmas-pine); }
+}

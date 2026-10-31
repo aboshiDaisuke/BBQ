@@ -5,13 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>飲み会 予算管理</title>
 <meta name="description" content="飲み会・BBQなどのイベント予算を管理するアプリ">
-<link rel="icon" type="image/webp" href="assets/app-icon.webp?v=9">
-<link rel="apple-touch-icon" href="assets/app-icon.png?v=9">
+<meta name="theme-color" content="#173f35">
+<link rel="icon" type="image/webp" href="assets/app-icon-christmas.webp?v=1">
+<link rel="apple-touch-icon" href="assets/app-icon-christmas.png?v=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800;900&family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="party.css">
+<link rel="stylesheet" href="christmas.css?v=20261101-balanced">
 </head>
 <body>
 
@@ -29,22 +31,23 @@
       <span style="--x:78%; --s:10px; --d:5.8s; --w:1.7s"></span>
       <span style="--x:90%; --s:15px; --d:7.4s; --w:4.2s"></span>
     </div>
-    <div class="splash-sparkle sparkle-1">✨</div>
-    <div class="splash-sparkle sparkle-2">💕</div>
+    <div class="splash-sparkle sparkle-1">❄</div>
+    <div class="splash-sparkle sparkle-2">🎁</div>
     <div class="splash-sparkle sparkle-3">⭐</div>
-    <div class="splash-sparkle sparkle-4">🫧</div>
+    <div class="splash-sparkle sparkle-4">❄</div>
   </div>
   <div class="splash-inner">
+    <div class="christmas-lights" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="christmas-greeting">Merry Christmas</div>
     <div class="splash-mascot-wrap">
       <div class="splash-glow"></div>
       <div class="splash-ring" aria-hidden="true"></div>
-      <img class="splash-mascot" src="assets/mascot.webp?v=9" alt="乾杯するぐろちゃん" width="152" height="270" decoding="async">
-      <div class="splash-kanpai" aria-hidden="true">かんぱーい！</div>
+      <span class="festive-mascot splash-character"><img class="splash-mascot" src="assets/mascot-christmas.webp?v=1" alt="赤いサンタ衣装で乾杯するぐろちゃん" width="152" height="270" decoding="async"></span>
     </div>
-    <div class="splash-badge">ぐろちゃんの PARTY CLUB ✦</div>
+    <div class="splash-badge">ぐろちゃんの CHRISTMAS PARTY ✦</div>
     <div class="splash-title" role="heading" aria-level="1" aria-label="飲み会管理"><span aria-hidden="true" style="--i:0">飲</span><span aria-hidden="true" style="--i:1">み</span><span aria-hidden="true" style="--i:2">会</span><span aria-hidden="true" class="is-sub" style="--i:3">管</span><span aria-hidden="true" class="is-sub" style="--i:4">理</span><span aria-hidden="true" class="splash-title-heart" style="--i:5">♡</span></div>
-    <div class="splash-tagline">楽しい時間も、お金の管理も。<br>ぐろちゃんと、かわいくしっかり ♡</div>
-    <button class="splash-start" id="splashStart" type="button">はじめる ♡ →</button>
+    <div class="splash-tagline">みんなで囲む、特別なひととき。<br>クリスマスの会計も、ぐろちゃんと ♡</div>
+    <button class="splash-start" id="splashStart" type="button">パーティーをはじめる →</button>
   </div>
 </div>
 
@@ -52,9 +55,9 @@
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-header">
     <div class="app-icon" aria-hidden="true">
-      <img src="assets/app-icon.webp?v=9" alt="" width="44" height="44" decoding="async">
+      <img src="assets/app-icon-christmas.webp?v=1" alt="" width="44" height="44" decoding="async">
     </div>
-    <div><div class="brand-eyebrow">ぐろちゃんと</div><div class="app-title">飲み会管理<span class="brand-heart">♥</span></div></div>
+    <div><div class="brand-eyebrow">ぐろちゃんと CHRISTMAS</div><div class="app-title">飲み会管理<span class="brand-heart" aria-hidden="true">✦</span></div></div>
   </div>
 
   <div class="sidebar-section-label">MY EVENTS <span>イベント</span></div>
@@ -79,8 +82,8 @@
   </button>
 
   <div class="sidebar-cheer" aria-hidden="true">
-    <img src="assets/mascot.webp?v=9" alt="" width="62" height="110">
-    <div><span>幹事さん、おつかれ♡</span><small>今日も楽しくいこっ！</small></div>
+    <img src="assets/mascot-christmas.webp?v=1" alt="" width="62" height="110">
+    <div><span>幹事さん、おつかれ♡</span><small>すてきなクリスマスにしよ！</small></div>
   </div>
   <div class="sidebar-footer">
     <button class="sidebar-action" id="btnCloud">🌥️ クラウド同期</button>
@@ -98,7 +101,7 @@
   <header class="mobile-header">
     <button class="menu-btn" id="btnMenu" aria-label="イベントと管理メニューを開く">☰</button>
     <span class="mobile-title">飲み会管理</span>
-    <img class="mobile-avatar" src="assets/app-icon.webp?v=9" alt="ぐろちゃん" width="36" height="36">
+    <img class="mobile-avatar" src="assets/app-icon-christmas.webp?v=1" alt="サンタ姿のぐろちゃん" width="36" height="36">
   </header>
 
   <!-- バックアップ促し -->
@@ -114,20 +117,20 @@
   </div>
 
   <main class="content" id="content">
-    <div class="page-eyebrow"><span>✦ PARTY MONEY NOTE</span><span>かわいく、しっかり。<span aria-hidden="true"> ♡</span></span></div>
+    <div class="page-eyebrow"><span>✦ CHRISTMAS PARTY NOTE</span><span>みんなで、あたたかな時間を。</span></div>
     <!-- 空状態 -->
     <div id="emptyState" class="empty-state">
       <div class="empty-icon-stage" aria-hidden="true">
         <div class="empty-icon empty-icon--img">
-          <img src="assets/mascot.webp?v=9" alt="" width="152" height="270" decoding="async">
+          <span class="festive-mascot empty-character"><img src="assets/mascot-christmas.webp?v=1" alt="" width="152" height="270" decoding="async"></span>
         </div>
-        <span class="empty-float f1">♡</span>
-        <span class="empty-float f2">✨</span>
-        <span class="empty-float f3">⭐</span>
+        <span class="empty-float f1">❄</span>
+        <span class="empty-float f2">🎁</span>
+        <span class="empty-float f3">✦</span>
       </div>
-      <span class="mini-label">LET’S PARTY ♡</span>
-      <h1 class="empty-title">次の楽しい予定、つくろっ。</h1>
-      <p class="empty-desc">飲み会もBBQも、これひとつ。<br>みんなのお金を、わかりやすく管理しよ♡</p>
+      <span class="mini-label">LET’S HAVE A CHRISTMAS PARTY</span>
+      <h1 class="empty-title">クリスマスの予定、つくろっ。</h1>
+      <p class="empty-desc">おいしいごはんに、プレゼント。<br>みんなのお金をまとめて、楽しい夜の準備を ♡</p>
       <button class="btn-primary" id="btnNewEventEmpty">＋ 新しいイベントを作成</button>
       <button class="btn-ghost" id="btnLoadSample">👀 サンプルを見る（使い方の例）</button>
       <ol class="welcome-steps"><li><b>01</b><span>イベントを作る</span></li><li><b>02</b><span>支出を記録する</span></li><li><b>03</b><span>集金をチェック</span></li></ol>
@@ -137,8 +140,9 @@
     <div id="eventDetail" class="hidden">
 
       <section class="party-hero" aria-label="ぐろちゃんからのメッセージ">
-        <div class="party-hero-copy"><span class="mini-label">GOOD TIMES, GOOD VIBES</span><h2>楽しく集まって、<br>お金もすっきり<span>♡</span></h2><p>支出を記録 → 集金をチェック。<br class="mobile-only">あとは、みんなでかんぱい！</p></div>
-        <div class="party-hero-art" aria-hidden="true"><span class="hero-orbit"></span><span class="hero-sticker">幹事、まかせて♡</span><span class="hero-star">✦</span><img src="assets/mascot.webp?v=9" alt="" width="152" height="270"><span class="hero-heart">♡</span></div>
+        <div class="christmas-lights" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="party-hero-copy"><span class="mini-label">MERRY CHRISTMAS & HAPPY GATHERINGS</span><h2>みんなで乾杯、<br>心あたたまる夜に<span>✦</span></h2><p>パーティーの予算も、集金も。<br class="mobile-only">ぐろちゃんと、すっきり準備しよ！</p></div>
+        <div class="party-hero-art" aria-hidden="true"><span class="hero-orbit"></span><span class="hero-star">❄</span><span class="festive-mascot hero-character"><img src="assets/mascot-christmas.webp?v=1" alt="" width="152" height="270"></span><span class="hero-heart">✧</span></div>
       </section>
 
       <!-- タイトルバー -->
@@ -241,7 +245,7 @@
             <div class="collection-progress-track" id="collectionProgressBar" role="progressbar" aria-label="集金済みの人数" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="collectionProgressFill"></span></div>
             <p id="collectionProgressHint">参加者ごとの集金額を入力してください。</p>
           </div>
-          <div class="collection-celebration hidden" id="collectionCelebration" role="status"><img src="assets/mascot.webp?v=9" alt="お祝いするぐろちゃん" width="48" height="85"><span>全員集金できたね！<br>幹事さん、おつかれ♡</span></div>
+          <div class="collection-celebration hidden" id="collectionCelebration" role="status"><img src="assets/mascot-christmas.webp?v=1" alt="サンタ姿でお祝いするぐろちゃん" width="48" height="85"><span>全員集金できたね！<br>幹事さん、おつかれ♡</span></div>
         </div>
         <div class="member-toolbar" id="memberToolbar" style="display:none">
           <span class="member-toolbar-info" id="unpaidSummary"></span>
@@ -364,7 +368,7 @@
       <p class="copy-event-note hidden" id="copyEventNote">参加者・役職・集金額をコピーします。出欠は「参加」、支払いは「未払い」からスタート。支出は引き継ぎません。</p>
       <div class="field">
         <label class="field-label">イベント名 <span class="required">必須</span></label>
-        <input type="text" id="newEventName" class="field-input" placeholder="例: 6月飲み会" autofocus>
+        <input type="text" id="newEventName" class="field-input" placeholder="例: クリスマスパーティー" autofocus>
       </div>
       <div class="field">
         <label class="field-label">日付</label>
@@ -545,5 +549,6 @@
 <script src="firebase-config.js"></script>
 <script src="app.js"></script>
 <script src="cloud.js"></script>
+<script type="module" src="christmas-scene.js?v=4"></script>
 </body>
 </html>
